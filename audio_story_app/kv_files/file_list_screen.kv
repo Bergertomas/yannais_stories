@@ -1,0 +1,16 @@
+<FileListScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        Button:
+            text: 'Back to Home'
+            background_color: (0.8, 0.2, 0.2, 1)  # Reddish
+            size_hint_y: None
+            height: 50
+            on_press: root.manager.current = 'home'
+        ScrollView:
+            BoxLayout:
+                id: recordings_list
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: 10  # Space between recording items

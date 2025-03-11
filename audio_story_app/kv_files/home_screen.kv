@@ -1,0 +1,44 @@
+<HomeScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 20
+        spacing: 10
+        canvas.before:
+            Color:
+                rgba: 0.9, 0.9, 0.9, 1  # Light gray background
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Label:
+            text: "Yannai's Stories"
+            font_size: 24
+            size_hint_y: None
+            height: 50
+        Button:
+            text: 'Import Recordings'
+            background_color: (0.2, 0.6, 0.8, 1)  # Light blue
+            size_hint_y: None
+            height: 60
+            on_press: root.manager.current = 'import'
+        Button:
+            text: 'File List'
+            background_color: (0.2, 0.8, 0.4, 1)  # Light green
+            size_hint_y: None
+            height: 60
+            on_press: root.manager.current = 'file_list'
+        Button:
+            text: 'Playlists'
+            background_color: 0.2, 0.6, 0.8, 1  # Blue
+            font_size: 16
+        Button:
+            text: 'Playlist Management'
+            background_color: (0.8, 0.4, 0.2, 1)  # Light orange
+            size_hint_y: None
+            height: 60
+            on_press: root.manager.current = 'playlist_management'
+        Button:
+            text: 'Settings'
+            background_color: (0.6, 0.2, 0.8, 1)  # Light purple
+            size_hint_y: None
+            height: 60
+            on_press: root.manager.current = 'settings'

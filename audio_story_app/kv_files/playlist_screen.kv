@@ -1,0 +1,27 @@
+<PlaylistScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        Button:
+            text: 'Back to Home'
+            background_color: (0.8, 0.2, 0.2, 1)  # Reddish
+            size_hint_y: None
+            height: 50
+            on_press: root.manager.current = 'home'
+        Label:
+            text: 'Playlists'
+            font_size: 20
+            size_hint_y: None
+            height: 40
+        ScrollView:
+            BoxLayout:
+                id: playlists_list
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: 5
+        Button:
+            text: 'Create New Playlist'
+            background_color: (0.2, 0.8, 0.4, 1)  # Light green
+            size_hint_y: None
+            height: 50
+            on_press: root.create_new_playlist()

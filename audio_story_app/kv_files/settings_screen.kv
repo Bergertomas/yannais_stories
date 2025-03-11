@@ -1,0 +1,23 @@
+<SettingsScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        Button:
+            text: 'Back to Home'
+            background_color: (0.8, 0.2, 0.2, 1)  # Reddish
+            size_hint_y: None
+            height: 50
+            on_press: root.manager.current = 'home'
+        Label:
+            text: 'Settings'
+            font_size: 20
+            size_hint_y: None
+            height: 40
+        Label:
+            text: 'Volume'
+            font_size: 16
+        Slider:
+            id: volume_slider
+            min: 0
+            max: 1
+            value: 0.5
+            on_value: app.player.set_volume(self.value)
