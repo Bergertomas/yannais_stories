@@ -2,43 +2,67 @@
     BoxLayout:
         orientation: 'vertical'
         padding: 20
-        spacing: 10
+        spacing: 15
         canvas.before:
             Color:
-                rgba: 0.9, 0.9, 0.9, 1  # Light gray background
+                rgba: theme.BACKGROUND_COLOR
             Rectangle:
                 pos: self.pos
                 size: self.size
+
+        # Title section
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: dp(100)
+            padding: [0, 10]
+
+            Label:
+                text: "DreamTales"
+                font_size: dp(36)
+                bold: True
+                size_hint_y: None
+                height: dp(60)
+
+            Label:
+                text: "Bedtime tales to whisk you away to dreamland"
+                font_size: dp(14)
+                size_hint_y: None
+                height: dp(30)
+
+        # Story grid
         Label:
-            text: "Yannai's Stories"
-            font_size: 24
+            text: "Choose Your Story"
             size_hint_y: None
-            height: 50
-        Button:
-            text: 'Import Recordings'
-            background_color: (0.2, 0.6, 0.8, 1)  # Light blue
-            size_hint_y: None
-            height: 60
-            on_press: root.manager.current = 'import'
-        Button:
-            text: 'File List'
-            background_color: (0.2, 0.8, 0.4, 1)  # Light green
-            size_hint_y: None
-            height: 60
-            on_press: root.manager.current = 'file_list'
-        Button:
-            text: 'Playlists'
-            background_color: 0.2, 0.6, 0.8, 1  # Blue
-            font_size: 16
-        Button:
-            text: 'Playlist Management'
-            background_color: (0.8, 0.4, 0.2, 1)  # Light orange
-            size_hint_y: None
-            height: 60
-            on_press: root.manager.current = 'playlist_management'
-        Button:
-            text: 'Settings'
-            background_color: (0.6, 0.2, 0.8, 1)  # Light purple
-            size_hint_y: None
-            height: 60
-            on_press: root.manager.current = 'settings'
+            height: dp(50)
+            font_size: dp(22)
+
+        # Story selection grid
+        GridLayout:
+            id: story_grid
+            cols: 2
+            spacing: 15
+            padding: [0, 0, 0, 10]
+
+            # These buttons will be populated dynamically in the Python code
+            # but we'll add a few placeholder buttons here for design purposes
+
+            Button:
+                text: "All Recordings"
+                background_color: 0.2, 0.4, 0.8, 1
+                on_release: root.navigate_to('file_list')
+
+            Button:
+                text: "Playlists"
+                background_color: 0.9, 0.5, 0.2, 1
+                on_release: root.navigate_to('playlist')
+
+            Button:
+                text: "Import Audio"
+                background_color: 0.2, 0.8, 0.4, 1
+                on_release: root.navigate_to('import')
+
+            Button:
+                text: "Settings"
+                background_color: 0.8, 0.3, 0.6, 1
+                on_release: root.navigate_to('settings')

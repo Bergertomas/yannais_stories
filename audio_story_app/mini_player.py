@@ -8,6 +8,7 @@ from kivy.clock import Clock
 from kivy.properties import ObjectProperty, StringProperty, BooleanProperty, NumericProperty
 import os
 import theme
+from kivy.graphics import Color, RoundedRectangle
 
 
 class MiniPlayer(BoxLayout):
@@ -32,11 +33,11 @@ class MiniPlayer(BoxLayout):
         # Add background
         self.canvas.before.clear()
         with self.canvas.before:
-            from kivy.graphics import Color, Rectangle
+            from kivy.graphics import Color, RoundedRectangle
             Color(*theme.SURFACE_COLOR)
-            self.rect = Rectangle(pos=self.pos, size=self.size)
+            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
             Color(0.2, 0.2, 0.2, 1)
-            self.border = Rectangle(pos=self.pos, size=(self.width, dp(1)))
+            self.border = RoundedRectangle(pos=self.pos, size=(self.width, dp(1)), radius=[dp(10)])
 
         # Bind size/pos changes to update rectangles
         self.bind(pos=self.update_rect, size=self.update_rect)
@@ -46,6 +47,7 @@ class MiniPlayer(BoxLayout):
             text=self.title,
             size_hint_x=0.5,
             halign='left',
+            valign='middle',
             shorten=True,
             shorten_from='right'
         )
@@ -60,27 +62,45 @@ class MiniPlayer(BoxLayout):
         )
         self.add_widget(self.progress_bar)
 
-        # Play/pause button - use simple text instead of unicode
+        # Play/pause button
         self.play_pause_btn = Button(
-            text="Play",  # Simple text
+            text="▶" if not self.is_playing else "⏸",
             size_hint_x=0.15,
-            font_size=dp(14),
+            font_size=dp(18),
+            background_normal='',
             background_color=theme.ACCENT_COLOR,
             on_release=self.toggle_play_pause
         )
+        self.apply_rounded_style(self.play_pause_btn, theme.ACCENT_COLOR)
         self.add_widget(self.play_pause_btn)
 
         # Go to playback screen button
         self.goto_btn = Button(
             text="Open",
             size_hint_x=0.15,
+            background_normal='',
             background_color=theme.PRIMARY_COLOR,
             on_release=self.goto_playback
         )
+        self.apply_rounded_style(self.goto_btn, theme.PRIMARY_COLOR)
         self.add_widget(self.goto_btn)
 
         # Schedule updates
         self.update_event = Clock.schedule_interval(self.update_state, 0.5)
+
+    def apply_rounded_style(self, button, color):
+        """Apply rounded style to a button."""
+        button.canvas.before.clear()
+        with button.canvas.before:
+            Color(*color)
+            button._rect = RoundedRectangle(pos=button.pos, size=button.size, radius=[dp(10)])
+        button.bind(pos=self.update_button_rect, size=self.update_button_rect)
+
+    def update_button_rect(self, instance, value):
+        """Update button rectangle on size/pos changes."""
+        if hasattr(instance, '_rect'):
+            instance._rect.pos = instance.pos
+            instance._rect.size = instance.size
 
     def update_rect(self, *args):
         """Update background rectangle on size/pos changes."""
@@ -113,7 +133,7 @@ class MiniPlayer(BoxLayout):
                 self.is_playing = app.player.is_playing
 
                 # Update play/pause button
-                self.play_pause_btn.text = "Pause" if self.is_playing else "Play"
+                self.play_pause_btn.text = "⏸" if self.is_playing else "▶"
 
                 # Update progress
                 if app.player.duration > 0:
@@ -138,10 +158,10 @@ class MiniPlayer(BoxLayout):
             print(f"Mini player: Toggle play/pause, current state: {app.player.is_playing}")
             if app.player.is_playing:
                 app.player.pause()
-                self.play_pause_btn.text = "Play"
+                self.play_pause_btn.text = "▶"
             else:
                 app.player.play()
-                self.play_pause_btn.text = "Pause"
+                self.play_pause_btn.text = "⏸"
         except Exception as e:
             print(f"Error toggling play/pause in mini player: {e}")
 

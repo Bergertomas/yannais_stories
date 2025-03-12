@@ -11,7 +11,14 @@ import random
 import theme
 from miscel.audio_story_app.button_icons import IconButton
 from kivy.uix.widget import Widget  # Add this import
+from kivy.lang import Builder
 
+
+# Load the kv file
+try:
+    Builder.load_file('kv_files/home_screen.kv')
+except Exception as e:
+    print(f"Error loading home_screen.kv: {e}")
 
 
 class StoryCard(BoxLayout):
@@ -273,30 +280,42 @@ class StoryCard(BoxLayout):
             self.button_bg.pos = instance.pos
             self.button_bg.size = instance.size
 
-    def play_recording(self, instance):
-        """Play the recording associated with this card."""
-        if self.recording_id is not None:
-            app = App.get_running_app()
-            try:
-                # Get the recording from database
-                recording = app.database.get_recording(self.recording_id)
+    def play_recording(self, recording_id):
+        """Play a specific recording."""
+        app = App.get_running_app()
+        try:
+            recording = app.database.get_recording(recording_id)
 
-                if recording:
-                    # Navigate to the playback screen
-                    app.root_layout.current = 'playback'
+            if recording:
+                # Navigate to the playback screen first
+                app.root_layout.current = 'playback'
 
-                    # Get the playback screen
-                    playback_screen = app.root_layout.get_screen('playback')
+                # Access the playback screen
+                playback_screen = app.root_layout.get_screen('playback')
+                if not playback_screen:
+                    print("Could not access playback screen")
+                    return
 
-                    # Get filepath from recording
-                    filepath = recording[3]
+                filepath = recording[3]  # Get filepath from recording tuple
 
-                    # Load and play
-                    if app.player.load(filepath):
-                        playback_screen.update_playback_info(recording)
+                # First load the file in our player
+                success = app.player.load(filepath)
+                if success:
+                    # Update the playback screen
+                    playback_screen.update_playback_info(recording)
+
+                    # Wait a moment for UI to update before playing
+                    from kivy.clock import Clock
+                    def start_playback(dt):
                         app.player.play()
-            except Exception as e:
-                print(f"Error playing recording: {e}")
+
+                    Clock.schedule_once(start_playback, 0.1)
+                else:
+                    print(f"Failed to load recording: {recording[1]}")
+            else:
+                print(f"Recording not found: ID {recording_id}")
+        except Exception as e:
+            print(f"Error playing recording: {e}")
 
 
 class NavButton(Button):
@@ -407,161 +426,235 @@ class DreamTalesHomeScreen(Screen):
         self.build_ui()
 
     def on_enter(self):
-        """Update content when screen is entered."""
-        self.update_story_cards()
+        """Called when the screen is entered - refresh content."""
+        # Update the story grid with actual recordings
+        self.update_story_grid()
+
+    def update_story_grid(self):
+        """Update the story grid with recent recordings."""
+        try:
+            # Get reference to the grid layout
+            story_grid = self.ids.story_grid
+
+            # Clear existing children
+            story_grid.clear_widgets()
+
+            # Get recent recordings
+            app = App.get_running_app()
+            recent_recordings = self.get_recent_recordings(app.database, limit=4)
+
+            # Add recordings as buttons
+            if recent_recordings:
+                for recording in recent_recordings:
+                    # Make sure we're getting the actual data, not the object's attributes
+                    try:
+                        recording_id, title, description, filepath, duration, date_created, cover_art = recording
+
+                        # Create a button for each recording
+                        recording_btn = Button(
+                            text=title if title and isinstance(title, str) else "Untitled Recording",
+                            background_normal='',
+                            on_release=lambda x, rec_id=recording_id: self.play_recording(rec_id)
+                        )
+                        # Apply custom styling to match our theme
+                        import random
+                        hue = random.random() * 0.2 + 0.2  # Random blue-ish hue
+                        recording_btn.background_color = (hue, hue + 0.2, 0.8, 1)
+
+                        story_grid.add_widget(recording_btn)
+                    except Exception as e:
+                        print(f"Error displaying recording: {e}")
+
+            # Add navigation buttons if we have fewer than 4 recordings
+            button_configs = [
+                {"text": "All Recordings", "screen": "file_list", "color": (0.2, 0.4, 0.8, 1)},
+                {"text": "Playlists", "screen": "playlist", "color": (0.9, 0.5, 0.2, 1)},
+                {"text": "Import Audio", "screen": "import", "color": (0.2, 0.8, 0.4, 1)},
+                {"text": "Settings", "screen": "settings", "color": (0.8, 0.3, 0.6, 1)}
+            ]
+
+            # Fill remaining slots with action buttons
+            remaining_slots = 4 - len(recent_recordings) if recent_recordings else 4
+            for i in range(min(remaining_slots, len(button_configs))):
+                config = button_configs[i]
+                btn = Button(
+                    text=config["text"],
+                    background_normal='',
+                    background_color=config["color"],
+                    on_release=lambda x, screen=config["screen"]: self.navigate_to(screen)
+                )
+                story_grid.add_widget(btn)
+
+        except Exception as e:
+            print(f"Error updating story grid: {e}")
+
+    def get_recent_recordings(self, database, limit=4):
+        """Get the most recently added recordings."""
+        if database:
+            try:
+                all_recordings = database.get_all_recordings()
+                return all_recordings[:limit] if all_recordings else []
+            except Exception as e:
+                print(f"Error fetching recent recordings: {e}")
+                return []
+        return []
+
+    # def build_ui(self):
+    #     """Build the entire UI structure."""
+    #     # Main layout
+    #     self.main_layout = BoxLayout(
+    #         orientation='vertical',
+    #         padding=0,
+    #         spacing=0
+    #     )
+    #
+    #     # Add starry background
+    #     self.stars_bg = StarsBackground()
+    #     self.add_widget(self.stars_bg)
+    #
+    #     # Header bar
+    #     self.header = BoxLayout(
+    #         orientation='horizontal',
+    #         size_hint_y=None,
+    #         height=dp(60),
+    #         padding=[dp(15), dp(10)],
+    #         spacing=dp(10)
+    #     )
+    #
+    #     # Add header background
+    #     with self.header.canvas.before:
+    #         Color(rgba=theme.PRIMARY_COLOR)
+    #         self.header_bg = RoundedRectangle(
+    #             pos=self.header.pos,
+    #             size=self.header.size,
+    #             radius=[0, 0, 0, 0]  # Square corners for header
+    #         )
+    #
+    #     # Add moon icon
+    #     moon_icon = BoxLayout(
+    #         size_hint_x=None,
+    #         width=dp(40)
+    #     )
+    #
+    #     with moon_icon.canvas:
+    #         # White moon circle
+    #         Color(rgba=(1, 1, 1, 1))
+    #         Ellipse(pos=(moon_icon.x + dp(5), moon_icon.y + dp(10)), size=(dp(25), dp(25)))
+    #
+    #     self.header.add_widget(moon_icon)
+    #
+    #     # App title
+    #     title = Label(
+    #         text="DreamTales",
+    #         font_size=dp(24),
+    #         bold=True,
+    #         color=theme.TEXT_COLOR,
+    #         size_hint_x=1
+    #     )
+    #     self.header.add_widget(title)
+    #
+    #     # Bind to update header background when size changes
+    #     self.header.bind(pos=self.update_header_bg, size=self.update_header_bg)
+    #
+    #     self.main_layout.add_widget(self.header)
+    #
+    #     # Content area
+    #     self.content = BoxLayout(
+    #         orientation='vertical',
+    #         padding=[dp(15), dp(20)],
+    #         spacing=dp(20)
+    #     )
+    #
+    #     # Page title
+    #     page_title = Label(
+    #         text="Choose Your Story",
+    #         font_size=dp(24),
+    #         bold=True,
+    #         color=theme.TEXT_COLOR,
+    #         size_hint_y=None,
+    #         height=dp(40),
+    #         halign='center'
+    #     )
+    #     self.content.add_widget(page_title)
+    #
+    #     # Subtitle
+    #     subtitle = Label(
+    #         text="Bedtime tales to whisk you away to dreamland.",
+    #         font_size=dp(14),
+    #         color=theme.SECONDARY_TEXT_COLOR,
+    #         size_hint_y=None,
+    #         height=dp(30),
+    #         halign='center'
+    #     )
+    #     self.content.add_widget(subtitle)
+    #
+    #     # Story cards grid
+    #     self.story_grid = GridLayout(
+    #         cols=2,
+    #         spacing=dp(15),
+    #         size_hint_y=None,
+    #         height=dp(350)  # Enough for 2 rows of cards
+    #     )
+    #
+    #     # Create initial story cards (will be updated with actual recordings)
+    #     self.create_sample_cards()
+    #
+    #     self.content.add_widget(self.story_grid)
+    #
+    #     self.main_layout.add_widget(self.content)
+    #
+    #     # Bottom navigation bar
+    #     self.nav_bar = BoxLayout(
+    #         orientation='horizontal',
+    #         size_hint_y=None,
+    #         height=dp(60),
+    #         padding=[dp(10), dp(5)],
+    #         spacing=dp(15)
+    #     )
+    #
+    #     # Add nav bar background
+    #     with self.nav_bar.canvas.before:
+    #         Color(rgba=theme.PRIMARY_COLOR)
+    #         self.nav_bg = RoundedRectangle(
+    #             pos=self.nav_bar.pos,
+    #             size=self.nav_bar.size,
+    #             radius=[0, 0, 0, 0]  # Square corners for nav bar
+    #         )
+    #
+    #     # Home button
+    #     home_btn = NavButton(
+    #         icon_type='home',
+    #         size_hint_x=1,
+    #         on_release=lambda x: self.navigate_to('home')
+    #     )
+    #     self.nav_bar.add_widget(home_btn)
+    #
+    #     # All recordings button
+    #     list_btn = NavButton(
+    #         icon_type='list',
+    #         size_hint_x=1,
+    #         on_release=lambda x: self.navigate_to('file_list')
+    #     )
+    #     self.nav_bar.add_widget(list_btn)
+    #
+    #     # Favorites/playlists button
+    #     favorites_btn = NavButton(
+    #         icon_type='star',
+    #         size_hint_x=1,
+    #         on_release=lambda x: self.navigate_to('playlist')
+    #     )
+    #     self.nav_bar.add_widget(favorites_btn)
+    #
+    #     # Bind to update nav background when size changes
+    #     self.nav_bar.bind(pos=self.update_nav_bg, size=self.update_nav_bg)
+    #
+    #     self.main_layout.add_widget(self.nav_bar)
+    #
+    #     self.add_widget(self.main_layout)
 
     def build_ui(self):
-        """Build the entire UI structure."""
-        # Main layout
-        self.main_layout = BoxLayout(
-            orientation='vertical',
-            padding=0,
-            spacing=0
-        )
-
-        # Add starry background
-        self.stars_bg = StarsBackground()
-        self.add_widget(self.stars_bg)
-
-        # Header bar
-        self.header = BoxLayout(
-            orientation='horizontal',
-            size_hint_y=None,
-            height=dp(60),
-            padding=[dp(15), dp(10)],
-            spacing=dp(10)
-        )
-
-        # Add header background
-        with self.header.canvas.before:
-            Color(rgba=theme.PRIMARY_COLOR)
-            self.header_bg = RoundedRectangle(
-                pos=self.header.pos,
-                size=self.header.size,
-                radius=[0, 0, 0, 0]  # Square corners for header
-            )
-
-        # Add moon icon
-        moon_icon = BoxLayout(
-            size_hint_x=None,
-            width=dp(40)
-        )
-
-        with moon_icon.canvas:
-            # White moon circle
-            Color(rgba=(1, 1, 1, 1))
-            Ellipse(pos=(moon_icon.x + dp(5), moon_icon.y + dp(10)), size=(dp(25), dp(25)))
-
-        self.header.add_widget(moon_icon)
-
-        # App title
-        title = Label(
-            text="DreamTales",
-            font_size=dp(24),
-            bold=True,
-            color=theme.TEXT_COLOR,
-            size_hint_x=1
-        )
-        self.header.add_widget(title)
-
-        # Bind to update header background when size changes
-        self.header.bind(pos=self.update_header_bg, size=self.update_header_bg)
-
-        self.main_layout.add_widget(self.header)
-
-        # Content area
-        self.content = BoxLayout(
-            orientation='vertical',
-            padding=[dp(15), dp(20)],
-            spacing=dp(20)
-        )
-
-        # Page title
-        page_title = Label(
-            text="Choose Your Story",
-            font_size=dp(24),
-            bold=True,
-            color=theme.TEXT_COLOR,
-            size_hint_y=None,
-            height=dp(40),
-            halign='center'
-        )
-        self.content.add_widget(page_title)
-
-        # Subtitle
-        subtitle = Label(
-            text="Bedtime tales to whisk you away to dreamland.",
-            font_size=dp(14),
-            color=theme.SECONDARY_TEXT_COLOR,
-            size_hint_y=None,
-            height=dp(30),
-            halign='center'
-        )
-        self.content.add_widget(subtitle)
-
-        # Story cards grid
-        self.story_grid = GridLayout(
-            cols=2,
-            spacing=dp(15),
-            size_hint_y=None,
-            height=dp(350)  # Enough for 2 rows of cards
-        )
-
-        # Create initial story cards (will be updated with actual recordings)
-        self.create_sample_cards()
-
-        self.content.add_widget(self.story_grid)
-
-        self.main_layout.add_widget(self.content)
-
-        # Bottom navigation bar
-        self.nav_bar = BoxLayout(
-            orientation='horizontal',
-            size_hint_y=None,
-            height=dp(60),
-            padding=[dp(10), dp(5)],
-            spacing=dp(15)
-        )
-
-        # Add nav bar background
-        with self.nav_bar.canvas.before:
-            Color(rgba=theme.PRIMARY_COLOR)
-            self.nav_bg = RoundedRectangle(
-                pos=self.nav_bar.pos,
-                size=self.nav_bar.size,
-                radius=[0, 0, 0, 0]  # Square corners for nav bar
-            )
-
-        # Home button
-        home_btn = NavButton(
-            icon_type='home',
-            size_hint_x=1,
-            on_release=lambda x: self.navigate_to('home')
-        )
-        self.nav_bar.add_widget(home_btn)
-
-        # All recordings button
-        list_btn = NavButton(
-            icon_type='list',
-            size_hint_x=1,
-            on_release=lambda x: self.navigate_to('file_list')
-        )
-        self.nav_bar.add_widget(list_btn)
-
-        # Favorites/playlists button
-        favorites_btn = NavButton(
-            icon_type='star',
-            size_hint_x=1,
-            on_release=lambda x: self.navigate_to('playlist')
-        )
-        self.nav_bar.add_widget(favorites_btn)
-
-        # Bind to update nav background when size changes
-        self.nav_bar.bind(pos=self.update_nav_bg, size=self.update_nav_bg)
-
-        self.main_layout.add_widget(self.nav_bar)
-
-        self.add_widget(self.main_layout)
+        """Build additional UI elements not defined in KV file."""
+        pass  # Most UI is now defined in KV file
 
     def create_sample_cards(self):
         """Create initial sample story cards."""

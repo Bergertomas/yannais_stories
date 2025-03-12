@@ -13,7 +13,9 @@ from datetime import datetime
 import random
 import os
 import math
-from button_icons import IconButton
+
+from miscel.audio_story_app import theme
+from miscel.audio_story_app.button_icons import IconButton
 
 # Define theme colors directly in this file to avoid import issues
 BACKGROUND_COLOR = (0.1, 0.18, 0.32, 1)  # Deep navy - night sky
@@ -425,300 +427,233 @@ class PlaybackScreen(Screen):
             app.player.bind(on_track_finished=self.on_track_finished)
 
     def build_ui(self):
-        """Build the rounded, fully-themed UI."""
-        # Main layout
+        """Build the UI for the playback screen."""
+        self.clear_widgets()
+
+        # Use a fixed layout
         main_layout = BoxLayout(
             orientation='vertical',
-            padding=0,
-            spacing=0
+            padding=dp(15),
+            spacing=dp(10),
+            size_hint=(1, 1)
         )
 
-        # Add starry background
-        self.starry_bg = StarryNightBackground()
-        self.add_widget(self.starry_bg)
-
-        # Header
+        # Header with back button and title
         header = BoxLayout(
-            orientation='horizontal',
             size_hint_y=None,
-            height=dp(60),
-            padding=[dp(15), dp(10)],
+            height=dp(50),
             spacing=dp(10)
         )
 
-        # Add header background
-        with header.canvas.before:
-            Color(rgba=PRIMARY_COLOR)
-            self.header_bg = Rectangle(pos=header.pos, size=header.size)
-
-        # Bind to update background
-        header.bind(pos=self.update_header_bg, size=self.update_header_bg)
-
-        # Back button
-        back_btn = RoundControlButton(
-            icon_type='back',
-            size_hint=(None, None),
-            size=(dp(40), dp(40)),
+        back_btn = Button(
+            text="Back",
+            size_hint_x=None,
+            width=dp(80),
+            background_normal='',
+            background_color=theme.PRIMARY_COLOR,
             on_release=self.go_back
         )
+        self.apply_rounded_style(back_btn, theme.PRIMARY_COLOR)
         header.add_widget(back_btn)
 
-        # Title
         self.title_label = Label(
             text="Now Playing",
             font_size=dp(20),
-            bold=True,
-            color=TEXT_COLOR
+            halign='center'
         )
         header.add_widget(self.title_label)
 
         main_layout.add_widget(header)
 
-        # Content area
-        content = BoxLayout(
+        # Recording info section
+        info_layout = BoxLayout(
             orientation='vertical',
-            padding=dp(20),
-            spacing=dp(20)
-        )
-
-        # Cover art / visualization area
-        visual_card = BoxLayout(
-            orientation='vertical',
+            padding=dp(10),
             size_hint_y=None,
-            height=dp(180),
-            padding=dp(15)
+            height=dp(120)
         )
 
-        # Add card background with rounded corners
-        with visual_card.canvas.before:
-            Color(rgba=SURFACE_COLOR)
-            self.visual_bg = RoundedRectangle(
-                pos=visual_card.pos,
-                size=visual_card.size,
-                radius=[dp(20)] * 4
-            )
-
-        # Update rectangle when layout changes
-        visual_card.bind(pos=self.update_visual_bg, size=self.update_visual_bg)
-
-        # Track info
+        # Description label
         self.description_label = Label(
             text="",
-            font_size=dp(16),
-            color=TEXT_COLOR,
+            size_hint_y=None,
+            height=dp(60),
+            halign='center',
+            valign='middle'
+        )
+        info_layout.add_widget(self.description_label)
+
+        # Date created
+        self.date_label = Label(
+            text="",
+            size_hint_y=None,
+            height=dp(30),
+            font_size=dp(14)
+        )
+        info_layout.add_widget(self.date_label)
+
+        main_layout.add_widget(info_layout)
+
+        # Spacer
+        main_layout.add_widget(BoxLayout(size_hint_y=0.2))
+
+        # Playback controls section
+        controls_layout = BoxLayout(
+            orientation='vertical',
+            padding=dp(20),
+            spacing=dp(15),
+            size_hint_y=None,
+            height=dp(220)
+        )
+
+        # Time and position slider
+        time_layout = BoxLayout(
             size_hint_y=None,
             height=dp(30)
         )
-        visual_card.add_widget(self.description_label)
 
-        # Date info
-        self.date_label = Label(
-            text="",
-            font_size=dp(14),
-            color=SECONDARY_TEXT_COLOR,
-            size_hint_y=None,
-            height=dp(20)
-        )
-        visual_card.add_widget(self.date_label)
-
-        # Add visualization elements
-        visual_area = BoxLayout(
-            orientation='vertical',
-            size_hint_y=None,
-            height=dp(80)
-        )
-
-        # Add moon and stars visualization
-        with visual_area.canvas:
-            # Moon
-            Color(rgba=ACCENT_COLOR)
-            moon_size = dp(40)
-            self.moon = Ellipse(
-                pos=(visual_card.width / 2 - moon_size / 2, visual_card.height / 2 - moon_size / 2),
-                size=(moon_size, moon_size)
-            )
-
-            # Add stars around moon
-            for i in range(12):
-                angle = i * 30  # 30 degrees between stars
-                radius = dp(50)  # Distance from center
-                x = visual_card.width / 2 + radius * 0.8 * math.cos(angle * math.pi / 180)
-                y = visual_card.height / 2 + radius * 0.8 * math.sin(angle * math.pi / 180)
-                star_size = random.random() * dp(4) + dp(1)
-
-                Color(rgba=STAR_WHITE)
-                Ellipse(pos=(x - star_size / 2, y - star_size / 2), size=(star_size, star_size))
-
-        visual_card.add_widget(visual_area)
-
-        content.add_widget(visual_card)
-
-        # Playback controls card
-        controls_card = BoxLayout(
-            orientation='vertical',
-            size_hint_y=None,
-            height=dp(220),
-            padding=dp(15),
-            spacing=dp(15)
-        )
-
-        # Add card background
-        with controls_card.canvas.before:
-            Color(rgba=SURFACE_COLOR)
-            self.controls_bg = RoundedRectangle(
-                pos=controls_card.pos,
-                size=controls_card.size,
-                radius=[dp(20)] * 4
-            )
-
-        # Update rectangle when layout changes
-        controls_card.bind(pos=self.update_controls_bg, size=self.update_controls_bg)
-
-        # Time display
         self.time_label = Label(
             text="00:00 / 00:00",
-            font_size=dp(14),
-            color=TEXT_COLOR,
-            size_hint_y=None,
-            height=dp(20)
+            size_hint_x=1.0
         )
-        controls_card.add_widget(self.time_label)
+        time_layout.add_widget(self.time_label)
 
-        # Position slider
-        self.position_slider = RoundedSlider(
+        controls_layout.add_widget(time_layout)
+
+        # Position slider with custom appearance
+        self.position_slider = Slider(
             min=0,
             max=100,
             value=0,
-            cursor_size=(dp(20), dp(20)),
             size_hint_y=None,
-            height=dp(30)
+            height=dp(30),
+            cursor_size=(dp(20), dp(20))
         )
-
-        # Bind slider events
         self.position_slider.bind(on_touch_down=self.on_slider_touch_down)
-        self.position_slider.bind(on_touch_move=self.on_slider_touch_move)
         self.position_slider.bind(on_touch_up=self.on_slider_touch_up)
+        controls_layout.add_widget(self.position_slider)
 
-        controls_card.add_widget(self.position_slider)
-
-        # Main playback controls
-        controls_row = BoxLayout(
-            orientation='horizontal',
+        # Playback buttons
+        buttons_layout = BoxLayout(
             size_hint_y=None,
-            height=dp(60),
-            spacing=dp(15)
+            height=dp(70),
+            spacing=dp(20),
+            padding=[dp(20), 0]
         )
 
         # Rewind button
-        rewind_btn = RoundControlButton(
-            icon_type='rewind',
-            size_hint_x=0.2,
-            background_color=PRIMARY_COLOR,
+        rewind_btn = Button(
+            text="⏮",
+            font_size=dp(24),
+            background_normal='',
+            background_color=theme.PRIMARY_COLOR,
             on_release=self.rewind
         )
-        controls_row.add_widget(rewind_btn)
+        self.apply_rounded_style(rewind_btn, theme.PRIMARY_COLOR)
+        buttons_layout.add_widget(rewind_btn)
 
-        # Play/Pause button (larger)
-        self.play_pause_btn = RoundControlButton(
-            icon_type='play',
-            size_hint_x=0.3,
-            background_color=ACCENT_COLOR,
+        # Play/Pause button
+        self.play_pause_btn = Button(
+            text="▶",
+            font_size=dp(24),
+            background_normal='',
+            background_color=theme.ACCENT_COLOR,
             on_release=self.toggle_play_pause
         )
-        controls_row.add_widget(self.play_pause_btn)
+        self.apply_rounded_style(self.play_pause_btn, theme.ACCENT_COLOR)
+        buttons_layout.add_widget(self.play_pause_btn)
 
         # Forward button
-        forward_btn = RoundControlButton(
-            icon_type='forward',
-            size_hint_x=0.2,
-            background_color=PRIMARY_COLOR,
+        forward_btn = Button(
+            text="⏭",
+            font_size=dp(24),
+            background_normal='',
+            background_color=theme.PRIMARY_COLOR,
             on_release=self.forward
         )
-        controls_row.add_widget(forward_btn)
+        self.apply_rounded_style(forward_btn, theme.PRIMARY_COLOR)
+        buttons_layout.add_widget(forward_btn)
 
-        controls_card.add_widget(controls_row)
+        controls_layout.add_widget(buttons_layout)
 
-        # Repeat and continue controls
-        options_row = BoxLayout(
-            orientation='horizontal',
+        # Additional control buttons
+        extra_buttons = BoxLayout(
             size_hint_y=None,
-            height=dp(40),
-            spacing=dp(20)
+            height=dp(50),
+            spacing=dp(20),
+            padding=[dp(20), 0]
         )
 
-        # Repeat toggle
-        self.repeat_button = IconToggleButton(
-            icon_type='repeat',
-            size_hint_x=0.5
+        # Repeat button
+        self.repeat_btn = Button(
+            text="🔁",
+            font_size=dp(20),
+            background_normal='',
+            background_color=theme.SURFACE_COLOR,
+            on_release=self.toggle_repeat
         )
-        options_row.add_widget(self.repeat_button)
+        self.apply_rounded_style(self.repeat_btn, theme.SURFACE_COLOR)
+        extra_buttons.add_widget(self.repeat_btn)
 
-        # Continue toggle
-        self.continue_button = IconToggleButton(
-            icon_type='continue',
-            size_hint_x=0.5
+        # Add to playlist button
+        playlist_btn = Button(
+            text="📋",
+            font_size=dp(20),
+            background_normal='',
+            background_color=theme.SURFACE_COLOR,
+            on_release=self.add_to_playlist
         )
-        options_row.add_widget(self.continue_button)
+        self.apply_rounded_style(playlist_btn, theme.SURFACE_COLOR)
+        extra_buttons.add_widget(playlist_btn)
 
-        controls_card.add_widget(options_row)
+        controls_layout.add_widget(extra_buttons)
 
         # Volume slider
-        volume_row = BoxLayout(
-            orientation='horizontal',
+        volume_layout = BoxLayout(
             size_hint_y=None,
-            height=dp(30),
+            height=dp(50),
             spacing=dp(10)
         )
 
         volume_label = Label(
-            text="Volume",
-            font_size=dp(14),
-            color=TEXT_COLOR,
+            text="🔊",
+            font_size=dp(20),
             size_hint_x=0.2
         )
-        volume_row.add_widget(volume_label)
+        volume_layout.add_widget(volume_label)
 
-        volume_slider = RoundedSlider(
+        volume_slider = Slider(
             min=0,
             max=1,
-            value=0.8,
+            value=1,
             size_hint_x=0.8
         )
         volume_slider.bind(value=self.on_volume_change)
-        volume_row.add_widget(volume_slider)
+        volume_layout.add_widget(volume_slider)
 
-        controls_card.add_widget(volume_row)
+        controls_layout.add_widget(volume_layout)
 
-        content.add_widget(controls_card)
+        main_layout.add_widget(controls_layout)
 
-        # Add to playlist button
-        add_playlist_btn = Button(
-            text="Add to Playlist",
-            size_hint_y=None,
-            height=dp(50),
-            background_normal='',
-            background_color=SUCCESS_COLOR,
-            color=TEXT_COLOR,
-            on_release=self.add_to_playlist
-        )
-
-        # Make button rounded
-        with add_playlist_btn.canvas.before:
-            Color(rgba=SUCCESS_COLOR)
-            self.playlist_btn_bg = RoundedRectangle(
-                pos=add_playlist_btn.pos,
-                size=add_playlist_btn.size,
-                radius=[dp(15)] * 4
-            )
-
-        # Update rectangle when layout changes
-        add_playlist_btn.bind(pos=self.update_playlist_btn_bg, size=self.update_playlist_btn_bg)
-
-        content.add_widget(add_playlist_btn)
-
-        main_layout.add_widget(content)
+        # Add a spacer at the bottom to push content up
+        main_layout.add_widget(BoxLayout(size_hint_y=0.1))
 
         self.add_widget(main_layout)
+
+    def apply_rounded_style(self, button, color):
+        """Apply rounded style to a button."""
+        button.canvas.before.clear()
+        with button.canvas.before:
+            Color(*color)
+            button._rect = RoundedRectangle(pos=button.pos, size=button.size, radius=[dp(10)])
+        button.bind(pos=self.update_button_rect, size=self.update_button_rect)
+
+
+    def update_button_rect(self, instance, value):
+        """Update button rectangle on size/pos changes."""
+        if hasattr(instance, '_rect'):
+            instance._rect.pos = instance.pos
+            instance._rect.size = instance.size
 
     def update_header_bg(self, instance, value):
         """Update header background when layout changes."""
@@ -744,15 +679,26 @@ class PlaybackScreen(Screen):
             self.playlist_btn_bg.pos = instance.pos
             self.playlist_btn_bg.size = instance.size
 
+    def toggle_repeat(self, instance):
+        """Toggle repeat mode."""
+        self.repeat_enabled = not self.repeat_enabled
+        if self.repeat_enabled:
+            self.repeat_btn.background_color = theme.ACCENT_COLOR
+            self.apply_rounded_style(self.repeat_btn, theme.ACCENT_COLOR)
+        else:
+            self.repeat_btn.background_color = theme.SURFACE_COLOR
+            self.apply_rounded_style(self.repeat_btn, theme.SURFACE_COLOR)
+
+        print(f"Repeat mode: {'enabled' if self.repeat_enabled else 'disabled'}")
+
     def update_playback_info(self, recording):
-        """Update UI with recording information."""
+        """Update the UI with recording information."""
         if not recording:
             print("No recording provided")
             return
 
         print(f"Updating playback info with recording: {recording}")
         self.current_recording = recording
-        self.is_track_finished = False
 
         try:
             recording_id, title, description, filepath, duration, date_created, cover_art = recording
@@ -799,6 +745,7 @@ class PlaybackScreen(Screen):
 
         except Exception as e:
             print(f"Error updating playback info: {e}")
+
 
     def update_ui(self, dt):
         """Update UI based on playback state."""
