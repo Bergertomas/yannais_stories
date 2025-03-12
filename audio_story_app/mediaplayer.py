@@ -3,10 +3,8 @@ from kivy.clock import Clock
 from kivy.properties import NumericProperty, StringProperty, BooleanProperty
 from kivy.event import EventDispatcher
 import os
-import time
-import platform as sys_platform  # Add this import line
+import platform as sys_platform
 
-plugin_path = None  # Initialize to None
 
 class AudioPlayer(EventDispatcher):
     """Audio player using VLC for reliable playback control."""
@@ -26,6 +24,7 @@ class AudioPlayer(EventDispatcher):
         self.player = None
         self.sound = None  # For compatibility
         self.update_event = None
+        self.end_reached = False
         self.initialize_vlc()
 
     def initialize_vlc(self):
@@ -33,7 +32,7 @@ class AudioPlayer(EventDispatcher):
         try:
             # Platform-specific initialization
             system = sys_platform.system()
-            plugin_path = None  # Initialize to None
+            plugin_path = None
 
             print(f"Detected platform: {system}")
 
@@ -107,6 +106,9 @@ class AudioPlayer(EventDispatcher):
         # Stop any current playback
         self.stop()
 
+        # Reset end reached flag
+        self.end_reached = False
+
         try:
             # Create a new media
             media = self.vlc_instance.media_new(filepath)
@@ -128,9 +130,15 @@ class AudioPlayer(EventDispatcher):
                     self.duration = duration_ms / 1000.0
                     print(f"Duration updated to {self.duration} seconds")
                 else:
-                    # If VLC can't determine length, use fallback
-                    self.duration = 100
-                    print("Using fallback duration of 100 seconds")
+                    # Try a direct query to the media itself
+                    media_duration = media.get_duration()
+                    if media_duration > 0:
+                        self.duration = media_duration / 1000.0
+                        print(f"Media duration: {self.duration} seconds")
+                    else:
+                        # If VLC can't determine length, use fallback
+                        self.duration = 100
+                        print("Using fallback duration of 100 seconds")
 
             Clock.schedule_once(get_duration, 0.5)
 
@@ -158,6 +166,8 @@ class AudioPlayer(EventDispatcher):
             return
 
         try:
+            # Reset end reached flag when playing
+            self.end_reached = False
             self.player.play()
             self.is_playing = True
             print("Started/resumed playback")
@@ -190,7 +200,7 @@ class AudioPlayer(EventDispatcher):
             print(f"Error stopping: {e}")
 
     def seek(self, position):
-        """Seek to a specific position in seconds."""
+        """Enhanced seek to a specific position in seconds."""
         if not self.vlc_instance or not self.player:
             print("Cannot seek: VLC not initialized")
             return
@@ -209,16 +219,24 @@ class AudioPlayer(EventDispatcher):
                 ms_position = length
 
             # Perform the seek
+            print(f"Seeking to {position}s ({ms_position}ms)")
+
+            # Remember playback state
+            was_playing = self.player.is_playing()
+
+            # Reset end reached flag when seeking
+            self.end_reached = False
+
+            # Perform actual seek operation
             result = self.player.set_time(ms_position)
 
             # Update current position property
             self.current_pos = position
 
-            print(f"Seeking to position: {position}s (Result: {'Success' if result != -1 else 'Failed'})")
+            print(f"Seek result: {'Success' if result != -1 else 'Failed'}")
 
-            # If seeking failed and the media is playing, try playing again
-            if result == -1 and self.is_playing:
-                print("Seek failed, trying to restart playback...")
+            # Ensure playback continues if it was playing before
+            if was_playing and not self.player.is_playing():
                 self.player.play()
 
         except Exception as e:
@@ -255,35 +273,36 @@ class AudioPlayer(EventDispatcher):
                 if length_ms > 0:
                     self.duration = length_ms / 1000.0
 
-            # Check for end of playback only if we're actually playing
-            if self.is_playing and not self.end_reached:
-                # Make sure we have valid duration and position
-                if self.current_pos > 0 and self.duration > 0:
-                    # Check if we've reached the end (within a small margin)
-                    if self.current_pos >= self.duration - 0.5:  # 0.5 second buffer
-                        print(f"Track reached end - position: {self.current_pos}, duration: {self.duration}")
-                        self.end_reached = True
-                        self.is_playing = False
-                        self.current_pos = 0
+            # Check for end of playback - compare current position to duration
+            if (not self.end_reached and
+                    self.current_pos > 0 and
+                    self.duration > 0 and
+                    self.current_pos >= self.duration - 0.5):  # 0.5 second buffer
 
-                        # Dispatch the track finished event
-                        self.dispatch('on_track_finished')
+                print("Track reached end - position:", self.current_pos, "duration:", self.duration)
+                self.end_reached = True
+                self.is_playing = False
 
-                # Alternative end detection method - check state
-                if self.player.get_state() == vlc.State.Ended:
-                    if not self.end_reached:
-                        print("Track ended (state detection)")
-                        self.end_reached = True
-                        self.is_playing = False
-                        self.current_pos = 0
-                        self.dispatch('on_track_finished')
+                # When end reached, reset position
+                self.current_pos = 0
+
+                # Dispatch the track finished event
+                self.dispatch('on_track_finished')
+
+            # Alternative end detection method - check state
+            if not self.end_reached and self.player.get_state() == vlc.State.Ended:
+                print("Track ended (state detection)")
+                self.end_reached = True
+                self.is_playing = False
+                self.current_pos = 0
+                self.dispatch('on_track_finished')
 
         except Exception as e:
             print(f"Error updating position: {e}")
 
     def on_track_finished(self, *args):
-        """Event handler for track completion."""
-        pass
+        """Event handler for track completion - to be overridden by subscribers."""
+        print("Track finished event raised from player")
 
 
 # Create singleton

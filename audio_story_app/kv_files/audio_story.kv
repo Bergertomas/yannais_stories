@@ -1,48 +1,74 @@
 #:kivy 2.0.0
 #:import theme theme
 
-<FixedWidthView@BoxLayout>:
-    orientation: 'vertical'
-    padding: dp(20)
-    spacing: dp(10)
-    size_hint: (1, 1)
-    canvas.before:
-        Color:
-            rgba: theme.BACKGROUND_COLOR
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-# Global styles
-<Label>:
-    color: theme.TEXT_COLOR
-    font_size: theme.FONT_SIZE_REGULAR
-    text_size: self.width, None
-    halign: 'center'
-    shorten: True
-
-<Button>:
+<RoundedButton@Button>:
+    background_normal: ''
+    background_color: theme.PRIMARY_COLOR
+    color: theme.BACKGROUND_COLOR
     font_size: theme.FONT_SIZE_REGULAR
     size_hint_y: None
     height: theme.BUTTON_HEIGHT_REGULAR
-    background_normal: ''
-    background_color: theme.PRIMARY_COLOR
-    color: theme.TEXT_COLOR
+    border_radius: [15, 15, 15, 15]
+    canvas.before:
+        Color:
+            rgba: self.background_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: self.border_radius
 
-<TextInput>:
+<StyledLabel@Label>:
+    color: theme.TEXT_COLOR
+    font_size: theme.FONT_SIZE_REGULAR
+    text_size: self.width, None
+    halign: 'left'
+    valign: 'middle'
+    shorten: True
+
+<HeaderLabel@Label>:
+    color: theme.TEXT_COLOR
+    font_size: theme.FONT_SIZE_LARGE
+    bold: True
+    text_size: self.width, None
+    halign: 'center'
+    size_hint_y: None
+    height: 40
+
+<StyledTextInput@TextInput>:
     font_size: theme.FONT_SIZE_REGULAR
     multiline: False
     padding: [10, 10, 10, 10]
     background_color: theme.SURFACE_COLOR
     foreground_color: theme.TEXT_COLOR
     cursor_color: theme.TEXT_COLOR
+    selection_color: theme.PRIMARY_COLOR + [0.4]
+    hint_text_color: theme.SECONDARY_TEXT_COLOR
+    canvas.before:
+        Color:
+            rgba: theme.SURFACE_COLOR
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [15, 15, 15, 15]
+        Color:
+            rgba: theme.PRIMARY_COLOR if self.focus else theme.DIVIDER_COLOR
+        Line:
+            rounded_rectangle: [self.pos[0], self.pos[1], self.size[0], self.size[1], 15]
+            width: 1.5
 
-<Slider>:
-    cursor_size: dp(20), dp(20)
-    cursor_disabled_size: dp(20), dp(20)
+<StyledSlider@Slider>:
+    cursor_size: 20, 20
+    cursor_disabled_size: 20, 20
+    background_width: 8
+    canvas:
+        Color:
+            rgba: theme.PRIMARY_COLOR
+        Rectangle:
+            pos: self.value_pos[0] - 10, self.center_y - 4
+            size: 20, 8
 
-<ScrollView>:
-    bar_width: dp(10)
+<StyledScrollView@ScrollView>:
+    bar_width: 6
     bar_color: theme.PRIMARY_COLOR
     bar_inactive_color: theme.PRIMARY_COLOR[0], theme.PRIMARY_COLOR[1], theme.PRIMARY_COLOR[2], 0.5
     effect_cls: "ScrollEffect"
@@ -55,3 +81,18 @@
         Rectangle:
             pos: self.pos
             size: self.size
+
+# Simple Card for Items
+<SimpleCard@BoxLayout>:
+    orientation: 'vertical'
+    padding: 10
+    spacing: 5
+    size_hint_y: None
+    height: 100
+    canvas.before:
+        Color:
+            rgba: theme.CARD_COLOR
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [15, 15, 15, 15]
