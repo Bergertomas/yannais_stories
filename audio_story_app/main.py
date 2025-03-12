@@ -13,7 +13,10 @@ Config.set('graphics', 'minimum_width', '400')
 Config.set('graphics', 'minimum_height', '600')
 
 # Load KV file
-Builder.load_file('./kv_files/audio_story.kv')
+try:
+    Builder.load_file('kv_files/audio_story.kv')
+except Exception as e:
+    print(f"Error loading KV file: {e}")
 
 # Import database and player
 from database import Database
@@ -50,7 +53,7 @@ class RootLayout(FloatLayout):
         self.sm.size_hint = (1, 1)
         self.add_widget(self.sm)
 
-        # Create mini player
+        # Create mini player (will be at the bottom of screen)
         self.mini_player = MiniPlayer()
         self.mini_player.pos_hint = {'x': 0, 'bottom': 0}
         self.mini_player.size_hint_x = 1
@@ -64,11 +67,16 @@ class RootLayout(FloatLayout):
     @current.setter
     def current(self, value):
         """Allow setting the current screen."""
-        self.sm.current = value
+        if self.sm.has_screen(value):
+            self.sm.current = value
+        else:
+            print(f"Screen {value} does not exist")
 
     def get_screen(self, name):
         """Get a screen by name."""
-        return self.sm.get_screen(name)
+        if self.sm.has_screen(name):
+            return self.sm.get_screen(name)
+        return None
 
 
 class AudioStoryApp(App):
@@ -93,8 +101,11 @@ class AudioStoryApp(App):
         self.player = global_player
 
         # Set default volume from settings
-        default_volume = float(self.database.get_setting('default_volume', '0.8'))
-        self.player.set_volume(default_volume)
+        try:
+            default_volume = float(self.database.get_setting('default_volume', '0.8'))
+            self.player.set_volume(default_volume)
+        except Exception as e:
+            print(f"Error setting default volume: {e}")
 
         # Create root layout
         self.root_layout = RootLayout()
@@ -102,10 +113,6 @@ class AudioStoryApp(App):
         # Set up keyboard/back button handling
         self.bind_keys()
 
-        return self.root_layout
-
-    def get_root(self):
-        """Get the root layout."""
         return self.root_layout
 
     def ensure_directories(self):
@@ -149,7 +156,7 @@ class AudioStoryApp(App):
 
     def handle_back_button(self, *args):
         """Handle back button press based on current screen."""
-        if not hasattr(self, 'root_layout'):
+        if not hasattr(self, 'root_layout') or not self.root_layout:
             return False
 
         current = self.root_layout.current
@@ -159,10 +166,7 @@ class AudioStoryApp(App):
             self.confirm_exit()
             return True
         elif current == 'playback':
-            # Go back but don't stop playback if background playback is enabled
-            background_playback = self.database.get_setting('background_playback', 'True') == 'True'
-            if not background_playback:
-                self.player.pause()  # Changed from stop to pause
+            # Go back but don't stop playback
             self.root_layout.current = 'file_list'
             return True
         else:
@@ -216,7 +220,7 @@ class AudioStoryApp(App):
         # Allow the app to continue in the background
         background_playback = self.database.get_setting('background_playback', 'True') == 'True'
 
-        if not background_playback and self.player.is_playing:
+        if not background_playback and self.player and self.player.is_playing:
             self.player.pause()
 
         return True
@@ -228,7 +232,7 @@ class AudioStoryApp(App):
     def on_stop(self):
         """Clean up resources when the app stops."""
         # Stop any playback
-        if self.player and self.player.is_playing:
+        if hasattr(self, 'player') and self.player and self.player.is_playing:
             self.player.stop()
 
         # Close database connection

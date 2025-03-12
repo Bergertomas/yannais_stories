@@ -6,6 +6,7 @@ from kivy.metrics import dp
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.properties import ObjectProperty, StringProperty, BooleanProperty, NumericProperty
+import os
 import theme
 
 
@@ -24,7 +25,9 @@ class MiniPlayer(BoxLayout):
         self.height = dp(60)
         self.padding = [dp(10), dp(5)]
         self.spacing = dp(10)
-        self.opacity = 1  # Start visible for testing
+
+        # Set initial opacity based on whether anything is playing
+        self.opacity = 1  # Always visible for testing
 
         # Add background
         self.canvas.before.clear()
@@ -57,11 +60,11 @@ class MiniPlayer(BoxLayout):
         )
         self.add_widget(self.progress_bar)
 
-        # Play/pause button
+        # Play/pause button - use simple text instead of unicode
         self.play_pause_btn = Button(
-            text="▶️" if not self.is_playing else "⏸",
+            text="Play",  # Simple text
             size_hint_x=0.15,
-            font_size=dp(20),
+            font_size=dp(14),
             background_color=theme.ACCENT_COLOR,
             on_release=self.toggle_play_pause
         )
@@ -97,50 +100,57 @@ class MiniPlayer(BoxLayout):
         try:
             # Update visibility based on whether anything is loaded
             if app.player.sound:
+                if self.opacity < 1:
+                    print("Mini player: Sound is loaded, showing mini player")
                 self.opacity = 1
+
+                # Update title from file path
+                if app.player.current_file:
+                    filename = os.path.basename(app.player.current_file)
+                    self.title = filename
+
+                # Update is_playing state
+                self.is_playing = app.player.is_playing
+
+                # Update play/pause button
+                self.play_pause_btn.text = "Pause" if self.is_playing else "Play"
+
+                # Update progress
+                if app.player.duration > 0:
+                    self.max_progress = app.player.duration
+                    self.progress = app.player.current_pos
+                    self.progress_bar.max = app.player.duration
+                    self.progress_bar.value = app.player.current_pos
             else:
+                if self.opacity > 0:
+                    print("Mini player: No sound loaded, hiding mini player")
                 self.opacity = 0
-                return
-
-            # Update title
-            if app.player.current_file:
-                filename = os.path.basename(app.player.current_file)
-                self.title = filename
-
-            # Update is_playing state
-            self.is_playing = app.player.is_playing
-
-            # Update play/pause button
-            self.play_pause_btn.text = "⏸" if self.is_playing else "▶️"
-
-            # Update progress
-            if app.player.duration > 0:
-                self.max_progress = app.player.duration
-                self.progress = app.player.current_pos
-                self.progress_bar.max = app.player.duration
-                self.progress_bar.value = app.player.current_pos
         except Exception as e:
             print(f"Error updating mini player: {e}")
 
     def toggle_play_pause(self, instance):
         """Toggle playback state."""
         app = App.get_running_app()
-        if not app.player:
+        if not app.player or not app.player.sound:
             return
 
         try:
+            print(f"Mini player: Toggle play/pause, current state: {app.player.is_playing}")
             if app.player.is_playing:
                 app.player.pause()
+                self.play_pause_btn.text = "Play"
             else:
                 app.player.play()
+                self.play_pause_btn.text = "Pause"
         except Exception as e:
-            print(f"Error toggling play/pause: {e}")
+            print(f"Error toggling play/pause in mini player: {e}")
 
     def goto_playback(self, instance):
         """Navigate to the full playback screen."""
         app = App.get_running_app()
-        if app.root:
-            app.root.current = 'playback'
+        if hasattr(app, 'root_layout'):
+            print("Mini player: Navigating to playback screen")
+            app.root_layout.current = 'playback'
 
     def on_touch_down(self, touch):
         """Handle touch events."""
@@ -151,6 +161,3 @@ class MiniPlayer(BoxLayout):
         if self.collide_point(*touch.pos):
             return super(MiniPlayer, self).on_touch_down(touch)
         return False
-
-
-import os

@@ -25,19 +25,23 @@ class PlaybackScreen(Screen):
         self.is_slider_being_dragged = False
         self.description_label = None
         self.date_label = None
-        self.build_ui()  # Build UI during initialization
+        # Build UI during initialization
+        self.build_ui()
 
     def on_enter(self):
         """Called when the screen is entered."""
-        # Only start the UI update timer, don't rebuild UI
+        # Start the UI update timer
         if not self.update_event:
             self.update_event = Clock.schedule_interval(self.update_ui, 0.1)
+
+        # Update the UI based on current playback state
+        self.update_play_pause_button()
 
     def build_ui(self):
         """Build the UI for the playback screen."""
         self.clear_widgets()
 
-        # Use a responsive view as the root layout
+        # Use a fixed layout
         main_layout = BoxLayout(
             orientation='vertical',
             padding=dp(15),
@@ -56,6 +60,7 @@ class PlaybackScreen(Screen):
             text="Back",
             size_hint_x=None,
             width=dp(80),
+            background_color=theme.PRIMARY_COLOR,
             on_release=self.go_back
         )
         header.add_widget(back_btn)
@@ -73,7 +78,8 @@ class PlaybackScreen(Screen):
         info_layout = BoxLayout(
             orientation='vertical',
             padding=dp(10),
-            size_hint_y=0.25
+            size_hint_y=None,
+            height=dp(120)
         )
 
         # Description label
@@ -98,14 +104,15 @@ class PlaybackScreen(Screen):
         main_layout.add_widget(info_layout)
 
         # Spacer
-        main_layout.add_widget(BoxLayout(size_hint_y=0.15))
+        main_layout.add_widget(BoxLayout(size_hint_y=0.2))
 
         # Playback controls section
         controls_layout = BoxLayout(
             orientation='vertical',
             padding=dp(20),
             spacing=dp(15),
-            size_hint_y=0.6
+            size_hint_y=None,
+            height=dp(200)
         )
 
         # Time and position slider
@@ -131,8 +138,8 @@ class PlaybackScreen(Screen):
             height=dp(30),
             cursor_size=(dp(20), dp(20))
         )
-        # Bind to value instead of touch events for more reliable behavior
-        self.position_slider.bind(value=self.on_slider_value)
+        self.position_slider.bind(on_touch_down=self.on_slider_touch_down)
+        self.position_slider.bind(on_touch_up=self.on_slider_touch_up)
         controls_layout.add_widget(self.position_slider)
 
         # Playback buttons
@@ -143,27 +150,27 @@ class PlaybackScreen(Screen):
             padding=[dp(20), 0]
         )
 
-        # Rewind button
+        # Rewind button - use simple text instead of unicode
         rewind_btn = Button(
-            text="⏮",  # Unicode rewind symbol
+            text="<<",  # Simple text rewind symbol
             font_size=dp(24),
             background_color=theme.PRIMARY_COLOR,
             on_release=self.rewind
         )
         buttons_layout.add_widget(rewind_btn)
 
-        # Play/Pause button
+        # Play/Pause button - use simple text instead of unicode
         self.play_pause_btn = Button(
-            text="⏸",  # Unicode pause symbol
-            font_size=dp(30),
+            text="Play",  # Simple text
+            font_size=dp(24),
             background_color=theme.ACCENT_COLOR,
             on_release=self.toggle_play_pause
         )
         buttons_layout.add_widget(self.play_pause_btn)
 
-        # Forward button
+        # Forward button - use simple text instead of unicode
         forward_btn = Button(
-            text="⏭",  # Unicode fast forward symbol
+            text=">>",  # Simple text forward symbol
             font_size=dp(24),
             background_color=theme.PRIMARY_COLOR,
             on_release=self.forward
@@ -180,8 +187,8 @@ class PlaybackScreen(Screen):
         )
 
         volume_label = Label(
-            text="🔊",  # Unicode volume symbol
-            size_hint_x=0.3
+            text="Volume",  # Simple text instead of unicode
+            size_hint_x=0.2
         )
         volume_layout.add_widget(volume_label)
 
@@ -189,7 +196,7 @@ class PlaybackScreen(Screen):
             min=0,
             max=1,
             value=1,
-            size_hint_x=0.7
+            size_hint_x=0.8
         )
         volume_slider.bind(value=self.on_volume_change)
         volume_layout.add_widget(volume_slider)
@@ -198,161 +205,176 @@ class PlaybackScreen(Screen):
 
         main_layout.add_widget(controls_layout)
 
-        self.add_widget(main_layout)
+        # Add a spacer at the bottom to push content up
+        main_layout.add_widget(BoxLayout(size_hint_y=0.1))
 
-        # If we have a current recording, update display with it
-        if self.current_recording:
-            self.update_playback_info(self.current_recording)
+        self.add_widget(main_layout)
 
     def update_playback_info(self, recording):
         """Update the UI with recording information."""
         if not recording:
+            print("No recording provided")
             return
 
+        print(f"Updating playback info with recording: {recording}")
         self.current_recording = recording
-        recording_id, title, description, filepath, duration, date_created, cover_art = recording
 
-        # Update title
-        self.title_label.text = title if title else "Untitled Recording"
-
-        # Update description
-        self.description_label.text = description if description else "No description"
-
-        # Update date
         try:
-            if date_created:
-                dt = datetime.fromisoformat(date_created)
-                formatted_date = dt.strftime("%b %d, %Y %H:%M")
+            recording_id, title, description, filepath, duration, date_created, cover_art = recording
+
+            # Update title
+            if title and isinstance(title, str):
+                self.title_label.text = title
             else:
-                formatted_date = "Unknown date"
+                self.title_label.text = "Untitled Recording"
+
+            # Update description
+            if description and isinstance(description, str):
+                self.description_label.text = description
+            else:
+                self.description_label.text = "No description"
+
+            # Update date
+            try:
+                if date_created and isinstance(date_created, str):
+                    dt = datetime.fromisoformat(date_created)
+                    formatted_date = dt.strftime("%b %d, %Y %H:%M")
+                else:
+                    formatted_date = "Unknown date"
+            except Exception as e:
+                print(f"Error formatting date: {e}")
+                formatted_date = "Invalid date"
+
+            self.date_label.text = formatted_date
+
+            # Update slider max value
+            app = App.get_running_app()
+            if app.player and app.player.duration > 0:
+                self.position_slider.max = app.player.duration
+                print(f"Setting slider max to {app.player.duration}")
+            elif duration and duration > 0:
+                self.position_slider.max = duration
+                print(f"Setting slider max to {duration}")
+            else:
+                self.position_slider.max = 100  # Default
+                print("Using default slider max of 100")
+
+            # Update play/pause button
+            self.update_play_pause_button()
+
         except Exception as e:
-            print(f"Error formatting date: {e}")
-            formatted_date = "Invalid date"
-
-        self.date_label.text = formatted_date
-
-        # Update slider max value
-        app = App.get_running_app()
-        if app.player and app.player.duration:
-            self.position_slider.max = app.player.duration
-        elif duration:
-            self.position_slider.max = duration
-        else:
-            self.position_slider.max = 100  # Default
-
-        # Update play/pause button
-        self.update_play_pause_button()
+            print(f"Error updating playback info: {e}")
 
     def update_ui(self, dt):
-        """Update the UI based on playback state (called by Clock)."""
+        """Update the UI based on playback state."""
         app = App.get_running_app()
 
+        if not app.player or not app.player.sound:
+            return
+
         # Update the position slider if not being dragged
-        if not self.is_slider_being_dragged and app.player and app.player.sound:
-            try:
-                # Block the event temporarily to avoid recursion
-                self.position_slider.unbind(value=self.on_slider_value)
+        try:
+            if not self.is_slider_being_dragged:
+                # Unbind temporarily to avoid recursive updates
                 self.position_slider.value = app.player.current_pos
-                self.position_slider.bind(value=self.on_slider_value)
-            except Exception as e:
-                print(f"Error updating slider position: {e}")
 
-        # Update the time label
-        if app.player and app.player.sound:
-            try:
-                current_pos = app.player.current_pos
-                duration = app.player.duration
+            # Update the time label
+            current_pos = app.player.current_pos
+            duration = app.player.duration
 
-                # Format as MM:SS / MM:SS
-                current_min = int(current_pos) // 60
-                current_sec = int(current_pos) % 60
-                total_min = int(duration) // 60
-                total_sec = int(duration) % 60
+            # Format as MM:SS / MM:SS
+            current_min = int(current_pos) // 60
+            current_sec = int(current_pos) % 60
+            total_min = int(duration) // 60
+            total_sec = int(duration) % 60
 
-                time_text = f"{current_min:02d}:{current_sec:02d} / {total_min:02d}:{total_sec:02d}"
-                self.time_label.text = time_text
-            except Exception as e:
-                print(f"Error updating time label: {e}")
-                self.time_label.text = "00:00 / 00:00"
+            time_text = f"{current_min:02d}:{current_sec:02d} / {total_min:02d}:{total_sec:02d}"
+            self.time_label.text = time_text
 
-        # Update play/pause button
-        self.update_play_pause_button()
+            # Update play/pause button
+            self.update_play_pause_button()
+
+        except Exception as e:
+            print(f"Error updating UI: {e}")
 
     def update_play_pause_button(self):
         """Update the play/pause button text based on playback state."""
         app = App.get_running_app()
         try:
             if app.player and app.player.is_playing:
-                self.play_pause_btn.text = "⏸"  # Unicode pause symbol
+                self.play_pause_btn.text = "Pause"  # Simple text
             else:
-                self.play_pause_btn.text = "▶️"  # Unicode play symbol
+                self.play_pause_btn.text = "Play"  # Simple text
         except Exception as e:
             print(f"Error updating play/pause button: {e}")
 
     def toggle_play_pause(self, instance):
         """Toggle between play and pause states."""
         app = App.get_running_app()
+
+        if not app.player or not app.player.sound:
+            print("No sound loaded to toggle playback")
+            return
+
         try:
             if app.player.is_playing:
-                print("Pausing playback")
+                print("Pausing playback via button press")
                 app.player.pause()
             else:
-                print("Starting playback")
+                print("Starting/resuming playback via button press")
                 app.player.play()
+
+            # Update button immediately
             self.update_play_pause_button()
+
         except Exception as e:
             print(f"Error toggling play/pause: {e}")
 
     def rewind(self, instance):
         """Rewind the playback by 10 seconds."""
         app = App.get_running_app()
+
+        if not app.player or not app.player.sound:
+            return
+
         try:
-            if app.player and app.player.sound:
-                new_pos = max(0, app.player.current_pos - 10)
-                print(f"Rewinding to: {new_pos}")
-                app.player.seek(new_pos)
+            new_pos = max(0, app.player.current_pos - 10)
+            print(f"Rewinding to position: {new_pos}")
+            app.player.seek(new_pos)
         except Exception as e:
             print(f"Error rewinding: {e}")
 
     def forward(self, instance):
         """Forward the playback by 10 seconds."""
         app = App.get_running_app()
-        try:
-            if app.player and app.player.sound:
-                new_pos = min(app.player.duration, app.player.current_pos + 10)
-                print(f"Forwarding to: {new_pos}")
-                app.player.seek(new_pos)
-        except Exception as e:
-            print(f"Error forwarding: {e}")
 
-    def on_slider_value(self, instance, value):
-        """Handle slider value change - seek to the new position."""
-        if self.is_slider_being_dragged:
-            app = App.get_running_app()
-            try:
-                if app.player and app.player.sound:
-                    print(f"Seeking to position: {value}")
-                    app.player.seek(value)
-            except Exception as e:
-                print(f"Error seeking to position: {e}")
+        if not app.player or not app.player.sound:
+            return
+
+        try:
+            new_pos = min(app.player.duration, app.player.current_pos + 10)
+            print(f"Fast forwarding to position: {new_pos}")
+            app.player.seek(new_pos)
+        except Exception as e:
+            print(f"Error fast forwarding: {e}")
 
     def on_slider_touch_down(self, instance, touch):
         """Handle slider touch down event."""
         if instance.collide_point(*touch.pos):
+            print("Slider touch down - starting drag")
             self.is_slider_being_dragged = True
             return True
         return False
 
     def on_slider_touch_up(self, instance, touch):
-        """Handle slider touch up event."""
+        """Handle slider touch up event - seek to the new position."""
         if instance.collide_point(*touch.pos) and self.is_slider_being_dragged:
             app = App.get_running_app()
-            try:
-                if app.player and app.player.sound:
-                    print(f"Seeking to position after drag: {instance.value}")
-                    app.player.seek(instance.value)
-            except Exception as e:
-                print(f"Error seeking to position: {e}")
+
+            position = instance.value
+            print(f"Seek to position: {position}")
+            app.player.seek(position)
+
             self.is_slider_being_dragged = False
             return True
         return False
@@ -360,17 +382,19 @@ class PlaybackScreen(Screen):
     def on_volume_change(self, instance, value):
         """Change the playback volume."""
         app = App.get_running_app()
+
+        if not app.player:
+            return
+
         try:
-            if app.player:
-                app.player.set_volume(value)
+            app.player.set_volume(value)
         except Exception as e:
             print(f"Error changing volume: {e}")
 
     def go_back(self, instance):
         """Navigate back and optionally stop playback."""
         app = App.get_running_app()
-        # Don't stop playback, just navigate back
-        app.root.current = 'file_list'
+        app.root_layout.current = 'file_list'
 
     def on_leave(self):
         """Called when the screen is exited."""

@@ -68,17 +68,20 @@ class HomeScreen(Screen):
         if recent_recordings:
             for recording in recent_recordings:
                 # Make sure we're getting the actual data, not the object's attributes
-                recording_id, title, description, filepath, duration, date_created, cover_art = recording
+                try:
+                    recording_id, title, description, filepath, duration, date_created, cover_art = recording
 
-                recording_btn = Button(
-                    text=title if title and isinstance(title, str) else "Untitled Recording",
-                    size_hint_y=None,
-                    height=dp(40),
-                    background_normal='',
-                    background_color=theme.PRIMARY_COLOR,
-                    on_release=lambda x, rec_id=recording_id: self.play_recording(rec_id)
-                )
-                recent_section.add_widget(recording_btn)
+                    recording_btn = Button(
+                        text=title if title and isinstance(title, str) else "Untitled Recording",
+                        size_hint_y=None,
+                        height=dp(40),
+                        background_normal='',
+                        background_color=theme.PRIMARY_COLOR,
+                        on_release=lambda x, rec_id=recording_id: self.play_recording(rec_id)
+                    )
+                    recent_section.add_widget(recording_btn)
+                except Exception as e:
+                    print(f"Error displaying recording: {e}")
         else:
             placeholder = Label(
                 text="No recordings yet. Go to Import to add some!",
@@ -183,15 +186,23 @@ class HomeScreen(Screen):
                 # Navigate to the playback screen first
                 app.root_layout.current = 'playback'
 
-                # Access the playback screen and update it with current recording info
+                # Access the playback screen
                 playback_screen = app.root_layout.get_screen('playback')
+                if not playback_screen:
+                    print("Could not access playback screen")
+                    return
 
-                # Load the recording into the player
-                if app.player.load(recording[3]):  # filepath is at index 3
-                    # Wait a moment for UI to update
+                filepath = recording[3]  # Get filepath from recording tuple
+
+                # First load the file in our player
+                success = app.player.load(filepath)
+                if success:
+                    # Update the playback screen
+                    playback_screen.update_playback_info(recording)
+
+                    # Wait a moment for UI to update before playing
                     from kivy.clock import Clock
                     def start_playback(dt):
-                        playback_screen.update_playback_info(recording)
                         app.player.play()
 
                     Clock.schedule_once(start_playback, 0.1)

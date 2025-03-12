@@ -1,184 +1,226 @@
-from kivy.core.audio import SoundLoader
+import vlc
 from kivy.clock import Clock
-from kivy.properties import NumericProperty, StringProperty, BooleanProperty, ObjectProperty
+from kivy.properties import NumericProperty, StringProperty, BooleanProperty
 from kivy.event import EventDispatcher
 import os
+import time
 
 
 class AudioPlayer(EventDispatcher):
-    """Audio player for managing and controlling audio playback."""
+    """Audio player using VLC for reliable playback control."""
 
     current_pos = NumericProperty(0)
-    duration = NumericProperty(0)
+    duration = NumericProperty(100)
     is_playing = BooleanProperty(False)
     current_file = StringProperty("")
     volume = NumericProperty(1.0)
-    sound = ObjectProperty(None, allownone=True)
 
     def __init__(self, **kwargs):
-        # Register events first
         self.register_event_type('on_track_finished')
         super(AudioPlayer, self).__init__(**kwargs)
+
+        # Initialize VLC instance with proper path
+        self.vlc_instance = None
+        self.player = None
+        self.sound = None  # For compatibility
         self.update_event = None
+        self.initialize_vlc()
+
+    def initialize_vlc(self):
+        """Initialize VLC with more aggressive path finding."""
+        try:
+            # Try to find the actual VLC binary path
+            import subprocess
+
+            try:
+                # Try to get VLC path from the system
+                result = subprocess.run(['which', 'vlc'], capture_output=True, text=True)
+                vlc_binary = result.stdout.strip()
+
+                if vlc_binary:
+                    # Get the directory containing VLC
+                    vlc_dir = os.path.dirname(vlc_binary)
+                    print(f"Found VLC binary at: {vlc_dir}")
+
+                    # Use this to find the lib directory
+                    if "/Applications/VLC.app" in vlc_dir:
+                        # Mac app bundle
+                        plugin_path = '/Applications/VLC.app/Contents/MacOS/lib'
+                    else:
+                        # Try common relative paths from the binary
+                        possible_lib_paths = [
+                            os.path.join(vlc_dir, '..', 'lib'),
+                            os.path.join(vlc_dir, '..', 'lib', 'vlc'),
+                            os.path.join(vlc_dir, 'lib'),
+                            os.path.join(vlc_dir, 'lib', 'vlc')
+                        ]
+
+                        for path in possible_lib_paths:
+                            if os.path.exists(path):
+                                plugin_path = path
+                                break
+
+                    if plugin_path:
+                        print(f"Using VLC plugin path: {plugin_path}")
+                        self.vlc_instance = vlc.Instance(f'--plugin-path={plugin_path}')
+                    else:
+                        # Fall back to default
+                        self.vlc_instance = vlc.Instance()
+                else:
+                    # Fall back to default
+                    self.vlc_instance = vlc.Instance()
+            except Exception as e:
+                print(f"Error finding VLC path: {e}")
+                self.vlc_instance = vlc.Instance()
+
+            self.player = self.vlc_instance.media_player_new()
+            print("VLC initialized successfully")
+        except Exception as e:
+            print(f"Error initializing VLC: {e}")
 
     def load(self, filepath):
-        """Load an audio file for playback."""
+        """Load an audio file."""
         print(f"Loading file: {filepath}")
+
         if not os.path.exists(filepath):
             print(f"File not found: {filepath}")
             return False
 
-        # Stop current sound if playing
+        if not self.vlc_instance or not self.player:
+            print("VLC not initialized")
+            return False
+
+        # Stop any current playback
         self.stop()
 
-        # Load new sound
         try:
-            self.sound = SoundLoader.load(filepath)
-            if self.sound:
-                print(f"Sound loaded successfully: {filepath}")
-                self.current_file = filepath
-                self.duration = self.sound.length
-                self.current_pos = 0
-                return True
+            # Create a new media
+            media = self.vlc_instance.media_new(filepath)
+
+            # Set up the player
+            self.player.set_media(media)
+
+            # Get media information
+            media.parse()
+
+            # Set media properties
+            self.current_file = filepath
+
+            # Get duration (in milliseconds) and convert to seconds
+            duration_ms = self.player.get_length()
+            if duration_ms > 0:
+                self.duration = duration_ms / 1000.0
             else:
-                print(f"Failed to load sound: {filepath}")
-                return False
+                # If VLC can't determine length, use fallback
+                self.duration = 100
+
+            # Reset position
+            self.current_pos = 0
+
+            # Set flag for compatibility
+            self.sound = True
+
+            # Start position updates
+            if self.update_event:
+                self.update_event.cancel()
+            self.update_event = Clock.schedule_interval(self.update_position, 0.1)
+
+            print(f"File loaded successfully. Duration: {self.duration}s")
+            return True
         except Exception as e:
-            print(f"Error loading sound: {e}")
+            print(f"Error loading audio file: {e}")
+            self.sound = None
             return False
 
     def play(self):
-        """Play or resume the current audio file."""
-        if not self.sound:
-            print("No sound loaded")
+        """Play or resume audio."""
+        if not self.vlc_instance or not self.player:
             return
 
         try:
-            if not self.is_playing:
-                print(f"Playing sound, current_pos: {self.current_pos}")
-                if self.current_pos > 0 and self.current_pos < self.duration:
-                    # Resume from position
-                    self.sound.seek(self.current_pos)
-                # Start or resume playback
-                self.sound.play()
-                self.is_playing = True
-
-                # Start update timer
-                if self.update_event:
-                    self.update_event.cancel()
-                self.update_event = Clock.schedule_interval(self.update_position, 0.1)
+            self.player.play()
+            self.is_playing = True
+            print("Started/resumed playback")
         except Exception as e:
-            print(f"Error playing sound: {e}")
+            print(f"Error playing audio: {e}")
+
+    def pause(self):
+        """Pause playback."""
+        if not self.vlc_instance or not self.player:
+            return
+
+        try:
+            self.player.pause()
+            self.is_playing = False
+            print("Paused playback")
+        except Exception as e:
+            print(f"Error pausing: {e}")
 
     def stop(self):
         """Stop playback and reset position."""
-        if not self.sound:
+        if not self.vlc_instance or not self.player:
             return
 
         try:
-            if self.sound.state != 'stop':
-                self.sound.stop()
-            if self.update_event:
-                self.update_event.cancel()
-                self.update_event = None
+            self.player.stop()
             self.is_playing = False
             self.current_pos = 0
+            print("Stopped playback")
         except Exception as e:
-            print(f"Error stopping sound: {e}")
-
-    def pause(self):
-        """Pause the current playback."""
-        if not self.sound or not self.is_playing:
-            return
-
-        try:
-            # Get current position first
-            self.current_pos = self.sound.get_pos()
-            print(f"Pausing at position: {self.current_pos}")
-
-            # Then stop the sound (which preserves the position)
-            self.sound.stop()
-
-            # Update state
-            self.is_playing = False
-
-            # Cancel update timer
-            if self.update_event:
-                self.update_event.cancel()
-                self.update_event = None
-        except Exception as e:
-            print(f"Error pausing sound: {e}")
+            print(f"Error stopping: {e}")
 
     def seek(self, position):
-        """Seek to a specific position in the audio file."""
-        if not self.sound:
-            print("No sound loaded")
+        """Seek to a specific position in seconds."""
+        if not self.vlc_instance or not self.player:
             return
 
         try:
-            if position < 0:
-                position = 0
-            elif position > self.duration:
-                position = self.duration
-
-            print(f"Seeking to position: {position}")
-            was_playing = self.is_playing
-
-            # Store the desired position
+            # Convert to milliseconds for VLC
+            ms_position = int(position * 1000)
+            self.player.set_time(ms_position)
             self.current_pos = position
-
-            # We need to stop and restart the sound to seek
-            if was_playing:
-                self.sound.stop()
-                self.sound.seek(position)
-                self.sound.play()
-            else:
-                self.sound.seek(position)
-
+            print(f"Seeking to position: {position}s")
         except Exception as e:
             print(f"Error seeking: {e}")
 
     def set_volume(self, volume):
-        """Set the playback volume (0.0 to 1.0)."""
-        if not self.sound:
+        """Set playback volume (0.0 to 1.0)."""
+        if not self.vlc_instance or not self.player:
             return
 
         try:
-            volume = max(0.0, min(1.0, volume))
-            self.sound.volume = volume
+            # VLC volume is 0-100
+            vlc_volume = int(volume * 100)
+            self.player.audio_set_volume(vlc_volume)
             self.volume = volume
+            print(f"Volume set to: {volume}")
         except Exception as e:
             print(f"Error setting volume: {e}")
 
     def update_position(self, dt):
-        """Update the current position property (called by Clock)."""
-        if not self.sound:
+        """Update the current position property."""
+        if not self.vlc_instance or not self.player:
             return
 
         try:
-            if self.sound.state == 'play':
-                new_pos = self.sound.get_pos()
-                # Update current position
-                self.current_pos = new_pos
+            # Get current time in milliseconds and convert to seconds
+            time_ms = self.player.get_time()
+            if time_ms >= 0:
+                self.current_pos = time_ms / 1000.0
 
-                # Check if we reached the end
-                if new_pos >= self.duration:
-                    print("Track finished")
-                    self.stop()
-                    self.dispatch('on_track_finished')
+            # Check if we've reached the end
+            state = self.player.get_state()
+            if state == vlc.State.Ended:
+                self.is_playing = False
+                self.current_pos = 0
+                self.dispatch('on_track_finished')
         except Exception as e:
             print(f"Error updating position: {e}")
 
-    def __del__(self):
-        """Clean up resources when the object is deleted."""
-        self.stop()
-        if self.sound:
-            self.sound.unload()
-
-    # Event handler - must be implemented
     def on_track_finished(self, *args):
+        """Event handler for track completion."""
         pass
 
 
-# Create a singleton instance for global use
+# Create singleton
 player = AudioPlayer()
