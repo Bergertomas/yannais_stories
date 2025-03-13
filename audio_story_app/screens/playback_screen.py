@@ -1,16 +1,13 @@
 from kivy.uix.screenmanager import Screen
-from kivy.uix.widget import Widget
 from kivy.metrics import dp
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.properties import NumericProperty, StringProperty
-from kivy.core.window import Window
 from datetime import datetime
-import math
 import theme
 
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDIconButton, MDRaisedButton, MDFlatButton
+from kivymd.uix.button import MDIconButton, MDFlatButton
 from kivymd.uix.label import MDLabel
 from kivymd.uix.slider import MDSlider
 from kivymd.uix.card import MDCard
@@ -18,7 +15,7 @@ from kivymd.uix.scrollview import MDScrollView
 
 
 class PlaybackScreen(Screen):
-    """Playback screen with modernized KivyMD UI."""
+    """Playback screen with modernized KivyMD UI and strict vertical layout."""
 
     position = NumericProperty(0)
     duration = NumericProperty(100)
@@ -41,18 +38,8 @@ class PlaybackScreen(Screen):
         self.current_playlist_id = None
         self.source_screen = None  # Track which screen we came from
 
-        # Bind to window resize to ensure proper layout
-        Window.bind(on_resize=self.on_window_resize)
-
         # Build UI during initialization
         self.build_ui()
-
-    def on_window_resize(self, instance, width, height):
-        """Handle window resize to ensure layout adapts properly"""
-        # Rebuild UI on significant size changes
-        if hasattr(self, 'main_scroll'):
-            # Ensure the scroll view adapts to the new size
-            self.main_scroll.size = (width, height)
 
     def on_enter(self):
         """Called when the screen is entered."""
@@ -69,98 +56,118 @@ class PlaybackScreen(Screen):
             app.player.bind(on_track_finished=self.on_track_finished)
 
     def build_ui(self):
-        """Build the UI for the playback screen."""
+        """Build the UI for the playback screen with strict vertical layout."""
         self.clear_widgets()
 
-        # Use scrollview for better handling of different screen sizes
-        self.main_scroll = MDScrollView(
-            do_scroll_x=False,
-            do_scroll_y=True
+        # Main container for the entire screen
+        main_container = MDBoxLayout(
+            orientation='vertical',
+            padding=0,
+            spacing=0,
+            md_bg_color=theme.BACKGROUND_COLOR
         )
 
-        # Main layout
-        main_layout = MDBoxLayout(
+        # ScrollView for content
+        scroll_view = MDScrollView(
+            do_scroll_x=False,
+            do_scroll_y=True,
+            bar_width=dp(4),
+            bar_color=theme.FLAX,
+            effect_cls="ScrollEffect"
+        )
+
+        # Main content layout
+        content_layout = MDBoxLayout(
             orientation='vertical',
             padding=dp(16),
-            spacing=dp(18),  # Increased spacing between elements
-            size_hint_y=None  # Needed for scroll to work
+            spacing=dp(24),  # Large spacing between sections
+            size_hint_y=None
         )
+        content_layout.bind(minimum_height=content_layout.setter('height'))
 
-        # Set initial height, will be adjusted below
-        main_layout.height = dp(700)
-
-        # Header with back button and title
+        # ========== HEADER SECTION ==========
         header = MDBoxLayout(
+            orientation='horizontal',
             size_hint_y=None,
             height=dp(56),
-            spacing=dp(8),
-            padding=[0, dp(8)]
+            spacing=dp(8)
         )
 
+        # Back button
         back_btn = MDIconButton(
             icon="arrow-left",
-            on_release=self.go_back,
             theme_text_color="Custom",
             text_color=theme.TEXT_COLOR,
-            icon_size=dp(24)  # Use icon_size instead of user_font_size
+            icon_size=dp(24),
+            on_release=self.go_back,
+            size_hint_x=None,
+            width=dp(48)
         )
         header.add_widget(back_btn)
 
+        # Title
         self.title_label = MDLabel(
             text="Now Playing",
             font_style="H5",
             theme_text_color="Custom",
             text_color=theme.TEXT_COLOR,
-            halign="center"
+            halign="center",
+            size_hint_x=1
         )
         header.add_widget(self.title_label)
 
-        # Add a spacer to balance the header
-        spacer = Widget(size_hint_x=None, width=dp(48))
+        # Spacer icon (invisible) to balance layout
+        spacer = MDIconButton(
+            icon="",
+            disabled=True,
+            opacity=0,
+            size_hint_x=None,
+            width=dp(48)
+        )
         header.add_widget(spacer)
 
-        main_layout.add_widget(header)
+        content_layout.add_widget(header)
 
-        # Album art card (placeholder with visual elements)
-        album_card = MDCard(
-            size_hint=(1, None),
-            height=dp(240),  # Increased height
-            radius=dp(20),
+        # ========== ALBUM/INFO CARD ==========
+        info_card = MDCard(
+            orientation='vertical',
+            size_hint_y=None,
+            height=dp(200),
+            radius=[dp(20)],
             elevation=4,
-            padding=dp(12)  # Increased padding
-        )
-        # Set background color safely
-        album_card.md_bg_color = theme.CARD_COLOR
-
-        # Add a visual icon for the album art
-        album_layout = MDBoxLayout(
-            orientation="vertical",
             padding=dp(16),
-            spacing=dp(12)  # Added spacing between elements
+            md_bg_color=theme.CARD_COLOR
         )
 
-        album_icon = MDIconButton(
+        # Music icon
+        icon_box = MDBoxLayout(
+            size_hint_y=None,
+            height=dp(80),
+            padding=[0, dp(8)]
+        )
+        music_icon = MDIconButton(
             icon="music-note",
-            icon_size=dp(96),  # Use icon_size instead of user_font_size
+            icon_size=dp(64),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
             theme_text_color="Custom",
-            text_color=theme.FLAX,  # Use gold color for icon
-            pos_hint={"center_x": 0.5, "center_y": 0.5}
+            text_color=theme.FLAX
         )
-        album_layout.add_widget(album_icon)
+        icon_box.add_widget(music_icon)
+        info_card.add_widget(icon_box)
 
-        # Description label inside the card
+        # Description label
         self.description_label = MDLabel(
             text="",
             theme_text_color="Custom",
             text_color=theme.TEXT_COLOR,
             halign="center",
-            font_style="Body1",
+            valign="middle",
             size_hint_y=None,
-            height=dp(60)  # Fixed height to prevent overlap
+            height=dp(60)
         )
-        album_layout.add_widget(self.description_label)
+        info_card.add_widget(self.description_label)
 
-        # Date label inside the card
+        # Date label
         self.date_label = MDLabel(
             text="",
             theme_text_color="Custom",
@@ -168,151 +175,153 @@ class PlaybackScreen(Screen):
             halign="center",
             font_style="Caption",
             size_hint_y=None,
-            height=dp(30)  # Fixed height to prevent overlap
+            height=dp(40)
         )
-        album_layout.add_widget(self.date_label)
+        info_card.add_widget(self.date_label)
 
-        album_card.add_widget(album_layout)
-        main_layout.add_widget(album_card)
+        content_layout.add_widget(info_card)
 
-        # Playback controls card
+        # Small spacer
+        content_layout.add_widget(MDBoxLayout(size_hint_y=None, height=dp(16)))
+
+        # ========== PLAYBACK CONTROLS CARD ==========
         controls_card = MDCard(
-            size_hint=(1, None),
-            height=dp(280),  # Increased height
-            radius=dp(20),
+            orientation='vertical',
+            size_hint_y=None,
+            height=dp(270),
+            radius=[dp(20)],
             elevation=4,
-            padding=dp(20)  # Increased padding
-        )
-        # Set background color safely
-        controls_card.md_bg_color = theme.SURFACE_COLOR
-
-        controls_layout = MDBoxLayout(
-            orientation="vertical",
-            spacing=dp(20)  # Increased spacing
+            padding=dp(16),
+            spacing=dp(12),
+            md_bg_color=theme.SURFACE_COLOR
         )
 
-        # Time and position slider
-        time_layout = MDBoxLayout(
+        # Time indicator
+        time_box = MDBoxLayout(
             size_hint_y=None,
             height=dp(30)
         )
-
         self.time_label = MDLabel(
             text="00:00 / 00:00",
             theme_text_color="Custom",
             text_color=theme.TEXT_COLOR,
             halign="center"
         )
-        time_layout.add_widget(self.time_label)
+        time_box.add_widget(self.time_label)
+        controls_card.add_widget(time_box)
 
-        controls_layout.add_widget(time_layout)
-
-        # Position slider
+        # Seek slider
         self.position_slider = MDSlider(
             min=0,
             max=100,
             value=0,
-            color=theme.FLAX,  # Use gold color from our theme
-            hint=False,  # Don't show the popup hint
+            color=theme.FLAX,
+            hint=False,
             size_hint_y=None,
-            height=dp(40)  # Increased height for better touch
+            height=dp(40)
         )
         self.position_slider.bind(on_touch_down=self.on_slider_touch_down)
         self.position_slider.bind(on_touch_up=self.on_slider_touch_up)
-        controls_layout.add_widget(self.position_slider)
+        controls_card.add_widget(self.position_slider)
 
-        # Main playback buttons
-        buttons_layout = MDBoxLayout(
+        # Main playback controls
+        controls_box = MDBoxLayout(
+            orientation='horizontal',
             size_hint_y=None,
-            height=dp(80),  # Increased height
-            spacing=dp(20),
-            padding=[dp(20), dp(10)]  # Added padding at top and bottom
+            height=dp(70),
+            padding=[0, dp(8)]
         )
-
-        # Add a spacer to center the buttons
-        buttons_layout.add_widget(Widget(size_hint_x=0.1))
 
         # Rewind button
         rewind_btn = MDIconButton(
             icon="rewind-10",
             theme_text_color="Custom",
             text_color=theme.FLAX,
-            icon_size=dp(36),  # Use icon_size instead of user_font_size
+            icon_size=dp(36),
             on_release=self.rewind
         )
-        buttons_layout.add_widget(rewind_btn)
+        controls_box.add_widget(rewind_btn)
 
         # Play/Pause button (larger)
         self.play_pause_btn = MDIconButton(
             icon="play",
             theme_text_color="Custom",
             text_color=theme.FLAX,
-            icon_size=dp(48),  # Use icon_size instead of user_font_size
+            icon_size=dp(48),
             on_release=self.toggle_play_pause
         )
-        buttons_layout.add_widget(self.play_pause_btn)
+        controls_box.add_widget(self.play_pause_btn)
 
         # Forward button
         forward_btn = MDIconButton(
             icon="fast-forward-10",
             theme_text_color="Custom",
             text_color=theme.FLAX,
-            icon_size=dp(36),  # Use icon_size instead of user_font_size
+            icon_size=dp(36),
             on_release=self.forward
         )
-        buttons_layout.add_widget(forward_btn)
+        controls_box.add_widget(forward_btn)
 
-        # Add another spacer to center the buttons
-        buttons_layout.add_widget(Widget(size_hint_x=0.1))
+        controls_card.add_widget(controls_box)
 
-        controls_layout.add_widget(buttons_layout)
-
-        # Additional control buttons (repeat and playlist)
-        extra_buttons = MDBoxLayout(
+        # Extra controls (repeat and playlist)
+        extra_controls = MDBoxLayout(
+            orientation='horizontal',
             size_hint_y=None,
-            height=dp(50),
-            spacing=dp(16),
-            padding=[dp(16), 0]
+            height=dp(50)
         )
 
-        # Repeat button
+        # Left side - Repeat button
+        left_box = MDBoxLayout(
+            size_hint_x=0.5,
+            orientation='horizontal'
+        )
         self.repeat_btn = MDIconButton(
             icon="repeat",
             theme_text_color="Custom",
             text_color=theme.DUTCH_WHITE,
-            icon_size=dp(24),  # Use icon_size instead of user_font_size
+            icon_size=dp(28),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
             on_release=self.toggle_repeat
         )
-        extra_buttons.add_widget(self.repeat_btn)
+        left_box.add_widget(self.repeat_btn)
+        extra_controls.add_widget(left_box)
 
-        # Add to playlist button
+        # Right side - Playlist button
+        right_box = MDBoxLayout(
+            size_hint_x=0.5,
+            orientation='horizontal'
+        )
         playlist_btn = MDIconButton(
             icon="playlist-plus",
             theme_text_color="Custom",
             text_color=theme.DUTCH_WHITE,
-            icon_size=dp(24),  # Use icon_size instead of user_font_size
+            icon_size=dp(28),
+            pos_hint={"center_x": 0.5, "center_y": 0.5},
             on_release=self.add_to_playlist
         )
-        extra_buttons.add_widget(playlist_btn)
+        right_box.add_widget(playlist_btn)
+        extra_controls.add_widget(right_box)
 
-        controls_layout.add_widget(extra_buttons)
+        controls_card.add_widget(extra_controls)
 
         # Volume slider
-        volume_layout = MDBoxLayout(
+        volume_box = MDBoxLayout(
+            orientation='horizontal',
             size_hint_y=None,
             height=dp(50),
-            spacing=dp(8)
+            padding=[dp(8), 0]
         )
 
         volume_icon = MDIconButton(
             icon="volume-medium",
             theme_text_color="Custom",
             text_color=theme.TEXT_COLOR,
-            icon_size=dp(24),  # Use icon_size instead of user_font_size
+            icon_size=dp(24),
             size_hint_x=None,
             width=dp(40)
         )
-        volume_layout.add_widget(volume_icon)
+        volume_box.add_widget(volume_icon)
 
         volume_slider = MDSlider(
             min=0,
@@ -322,32 +331,27 @@ class PlaybackScreen(Screen):
             hint=False
         )
         volume_slider.bind(value=self.on_volume_change)
-        volume_layout.add_widget(volume_slider)
+        volume_box.add_widget(volume_slider)
 
-        controls_layout.add_widget(volume_layout)
-        controls_card.add_widget(controls_layout)
-        main_layout.add_widget(controls_card)
+        controls_card.add_widget(volume_box)
 
-        # Add a spacer at the bottom to push content up
-        main_layout.add_widget(Widget(size_hint_y=None, height=dp(30)))
+        content_layout.add_widget(controls_card)
 
-        # Calculate total height based on children
-        total_height = 0
-        for child in main_layout.children:
-            if hasattr(child, 'height'):
-                total_height += child.height
+        # ========== BOTTOM SPACING FOR MINI PLAYER ==========
+        bottom_space = MDBoxLayout(
+            size_hint_y=None,
+            height=dp(80)
+        )
+        content_layout.add_widget(bottom_space)
 
-        # Add padding for spacing
-        total_height += dp(100)
+        # Add content layout to scroll view
+        scroll_view.add_widget(content_layout)
 
-        # Set minimum height to ensure scrolling works properly
-        main_layout.height = max(total_height, dp(700))
+        # Add scroll view to main container
+        main_container.add_widget(scroll_view)
 
-        # Add main layout to scroll view
-        self.main_scroll.add_widget(main_layout)
-
-        # Add scroll view to screen
-        self.add_widget(self.main_scroll)
+        # Add main container to the screen
+        self.add_widget(main_container)
 
     def update_playback_info(self, recording):
         """Update the UI with recording information."""
@@ -648,7 +652,7 @@ class PlaybackScreen(Screen):
             print(f"Error playing next track: {e}")
             return False
 
-    def go_back(self, instance):
+    def go_back(self, instance=None):
         """Navigate back to previous screen."""
         app = App.get_running_app()
 

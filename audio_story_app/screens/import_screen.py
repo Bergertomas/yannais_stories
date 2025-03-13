@@ -1,13 +1,19 @@
 from kivy.uix.screenmanager import Screen
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.filechooser import FileChooserListView
 from kivy.metrics import dp
 from kivy.app import App
+from kivy.clock import Clock
 import os
-from kivy.core.audio import SoundLoader
+import shutil
+import theme
+
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.button import MDRaisedButton, MDFlatButton
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.filemanager import MDFileManager
+from kivymd.uix.label import MDLabel
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.card import MDCard
+from kivymd.toast import toast
 
 
 class ImportScreen(Screen):
@@ -16,132 +22,184 @@ class ImportScreen(Screen):
     def __init__(self, **kwargs):
         super(ImportScreen, self).__init__(**kwargs)
         self.selected_file = None
-        self.file_chooser = None
+        self.file_manager = None
+        self.dialog = None
+        self.title_input = None
+        self.desc_input = None
+
+        # Build UI during initialization
         self.build_ui()
 
     def build_ui(self):
-        """Build the UI for the import screen."""
-        main_layout = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
-
-        # Header with back button and title
-        header = BoxLayout(
-            size_hint_y=None,
-            height=dp(50),
-            spacing=dp(10)
+        """Build the UI for the import screen using KivyMD components."""
+        main_layout = MDBoxLayout(
+            orientation='vertical',
+            padding=dp(16),
+            spacing=dp(16),
+            md_bg_color=theme.BACKGROUND_COLOR
         )
 
-        back_btn = Button(
+        # Header with back button and title
+        header = MDBoxLayout(
+            size_hint_y=None,
+            height=dp(56),
+            spacing=dp(8),
+            padding=[0, dp(8)]
+        )
+
+        # Back button
+        back_btn = MDRaisedButton(
             text="Back",
-            size_hint_x=None,
-            width=dp(80),
-            on_release=self.go_back
+            on_release=self.go_back,
+            md_bg_color=theme.PRIMARY_COLOR,
+            text_color=theme.TEXT_COLOR
         )
         header.add_widget(back_btn)
 
-        title = Label(
+        # Title
+        title = MDLabel(
             text="Import Audio",
-            font_size=dp(24)
+            font_style="H5",
+            halign="center",
+            theme_text_color="Custom",
+            text_color=theme.TEXT_COLOR
         )
         header.add_widget(title)
 
+        # Add a spacer widget for balance
+        spacer = MDBoxLayout(size_hint_x=None, width=back_btn.width)
+        header.add_widget(spacer)
+
         main_layout.add_widget(header)
 
-        # Instructions
-        instructions = Label(
-            text="Select an audio file to import:",
+        # Card for import instructions
+        instruction_card = MDCard(
+            orientation="vertical",
             size_hint_y=None,
-            height=dp(40),
-            halign='left'
+            height=dp(100),
+            padding=dp(16),
+            radius=dp(10),
+            elevation=2
         )
-        instructions.bind(size=instructions.setter('text_size'))
-        main_layout.add_widget(instructions)
+        instruction_card.md_bg_color = theme.SURFACE_COLOR
 
-        # File chooser
-        self.file_chooser = FileChooserListView(
-            path=self.get_default_path(),
-            filters=['*.mp3', '*.wav', '*.ogg', '*.m4a']
+        instructions = MDLabel(
+            text="Select an audio file to import.\nSupported formats: MP3, WAV, OGG",
+            theme_text_color="Custom",
+            text_color=theme.TEXT_COLOR,
+            halign="center"
         )
-        self.file_chooser.bind(selection=self.on_file_selected)
-        main_layout.add_widget(self.file_chooser)
+        instruction_card.add_widget(instructions)
 
-        # Selected file info
-        self.selected_file_label = Label(
+        main_layout.add_widget(instruction_card)
+
+        # Card for selected file info
+        file_info_card = MDCard(
+            orientation="vertical",
+            size_hint_y=None,
+            height=dp(80),
+            padding=dp(16),
+            radius=dp(10),
+            elevation=2
+        )
+        file_info_card.md_bg_color = theme.SURFACE_COLOR
+
+        self.selected_file_label = MDLabel(
             text="No file selected",
-            size_hint_y=None,
-            height=dp(40)
+            theme_text_color="Custom",
+            text_color=theme.TEXT_COLOR,
+            halign="center"
         )
-        main_layout.add_widget(self.selected_file_label)
+        file_info_card.add_widget(self.selected_file_label)
 
-        # Metadata input section
-        metadata_layout = BoxLayout(
-            orientation='vertical',
+        main_layout.add_widget(file_info_card)
+
+        # Card for metadata input
+        metadata_card = MDCard(
+            orientation="vertical",
             size_hint_y=None,
-            height=dp(180),
-            spacing=dp(10),
-            padding=[0, dp(10)]
+            height=dp(200),
+            padding=dp(16),
+            spacing=dp(16),
+            radius=dp(10),
+            elevation=2
         )
+        metadata_card.md_bg_color = theme.SURFACE_COLOR
 
         # Title input
-        title_layout = BoxLayout(
-            size_hint_y=None,
-            height=dp(50)
-        )
-        title_layout.add_widget(Label(
-            text="Title:",
-            size_hint_x=0.3
-        ))
-        self.title_input = TextInput(
+        self.title_input = MDTextField(
             hint_text="Enter a title for this recording",
-            multiline=False
+            mode="rectangle",
+            helper_text="Required",
+            helper_text_mode="on_error"
         )
-        title_layout.add_widget(self.title_input)
-        metadata_layout.add_widget(title_layout)
+        metadata_card.add_widget(self.title_input)
 
         # Description input
-        desc_layout = BoxLayout(
-            size_hint_y=None,
-            height=dp(100)
-        )
-        desc_layout.add_widget(Label(
-            text="Description:",
-            size_hint_x=0.3,
-            valign='top'
-        ))
-        self.desc_input = TextInput(
+        self.desc_input = MDTextField(
             hint_text="Enter an optional description",
+            mode="rectangle",
             multiline=True
         )
-        desc_layout.add_widget(self.desc_input)
-        metadata_layout.add_widget(desc_layout)
+        metadata_card.add_widget(self.desc_input)
 
-        main_layout.add_widget(metadata_layout)
+        main_layout.add_widget(metadata_card)
+
+        # Browse button
+        browse_btn = MDRaisedButton(
+            text="Browse for Audio File",
+            on_release=self.show_file_manager,
+            md_bg_color=theme.PRIMARY_COLOR,
+            text_color=theme.TEXT_COLOR,
+            pos_hint={"center_x": 0.5},
+            size_hint_x=0.8
+        )
+        main_layout.add_widget(browse_btn)
 
         # Import button
-        import_btn = Button(
+        import_btn = MDRaisedButton(
             text="Import File",
-            size_hint_y=None,
-            height=dp(60),
-            background_normal='',
-            background_color=(0.2, 0.7, 0.2, 1),
-            on_release=self.import_file
+            on_release=self.import_file,
+            md_bg_color=theme.SUCCESS_COLOR,
+            text_color=theme.TEXT_COLOR,
+            pos_hint={"center_x": 0.5},
+            size_hint_x=0.8
         )
         main_layout.add_widget(import_btn)
 
+        # Add a spacer at the bottom
+        main_layout.add_widget(MDBoxLayout(size_hint_y=0.1))
+
         self.add_widget(main_layout)
 
-    def get_default_path(self):
-        """Get a sensible default path for the file chooser."""
-        # Try to use the external storage on Android
-        if os.path.exists('/storage/emulated/0'):
-            return '/storage/emulated/0'
+        # Initialize the file manager
+        self.file_manager = MDFileManager(
+            exit_manager=self.exit_file_manager,
+            select_path=self.select_path,
+            preview=True,
+            ext=['.mp3', '.wav', '.ogg', '.m4a']
+        )
 
-        # Fall back to the app's directory
-        return os.path.dirname(os.path.abspath(__file__))
+    def show_file_manager(self, instance):
+        """Show the file manager to select an audio file."""
+        try:
+            # Set the starting path
+            start_path = self.get_default_path()
+            self.file_manager.show(start_path)
+        except Exception as e:
+            print(f"Error showing file manager: {e}")
+            self.show_error(f"Error opening file browser: {str(e)}")
 
-    def on_file_selected(self, instance, selection):
-        """Handle file selection."""
-        if selection:
-            self.selected_file = selection[0]
+    def exit_file_manager(self, *args):
+        """Close the file manager."""
+        self.file_manager.close()
+
+    def select_path(self, path):
+        """Handle file selection from the file manager."""
+        self.exit_file_manager()
+
+        if os.path.isfile(path):
+            self.selected_file = path
             filename = os.path.basename(self.selected_file)
             self.selected_file_label.text = f"Selected: {filename}"
 
@@ -149,8 +207,24 @@ class ImportScreen(Screen):
             name_without_ext = os.path.splitext(filename)[0]
             self.title_input.text = name_without_ext
         else:
-            self.selected_file = None
-            self.selected_file_label.text = "No file selected"
+            self.show_error("Please select a valid audio file.")
+
+    def get_default_path(self):
+        """Get a sensible default path for the file chooser."""
+        # Try to use the external storage on Android
+        if os.path.exists('/storage/emulated/0'):
+            return '/storage/emulated/0'
+
+        # On Android 11+, try to use Music directory
+        if os.path.exists('/storage/emulated/0/Music'):
+            return '/storage/emulated/0/Music'
+
+        # Try to use the Downloads directory
+        if os.path.exists('/storage/emulated/0/Download'):
+            return '/storage/emulated/0/Download'
+
+        # Fall back to the app's directory
+        return os.path.dirname(os.path.abspath(__file__))
 
     def import_file(self, instance):
         """Import the selected file into the app."""
@@ -167,16 +241,30 @@ class ImportScreen(Screen):
 
         # Get file info
         try:
-            # Load the sound to get its duration
+            # Try to get duration from a sound
+            from kivy.core.audio import SoundLoader
             sound = SoundLoader.load(self.selected_file)
             duration = sound.length if sound else 0
             if sound:
                 sound.unload()
 
+            # If we couldn't get duration, use a placeholder
+            if not duration or duration <= 0:
+                print("Could not detect audio duration, using placeholder")
+                duration = 0  # Database will handle this
+
             # Copy the file to the app's data directory
             app = App.get_running_app()
+
+            # Make sure the destination directory exists
             dest_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'recordings')
-            os.makedirs(dest_dir, exist_ok=True)
+            try:
+                os.makedirs(dest_dir, exist_ok=True)
+            except Exception as e:
+                print(f"Error creating recordings directory: {e}")
+                # Try an alternative path
+                dest_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'recordings')
+                os.makedirs(dest_dir, exist_ok=True)
 
             filename = os.path.basename(self.selected_file)
             dest_path = os.path.join(dest_dir, filename)
@@ -189,6 +277,7 @@ class ImportScreen(Screen):
                 counter += 1
 
             # Copy the file
+            print(f"Copying file from {self.selected_file} to {dest_path}")
             with open(self.selected_file, 'rb') as src_file:
                 with open(dest_path, 'wb') as dest_file:
                     dest_file.write(src_file.read())
@@ -209,75 +298,63 @@ class ImportScreen(Screen):
             self.desc_input.text = ""
             self.selected_file = None
             self.selected_file_label.text = "No file selected"
-            self.file_chooser.selection = []
 
         except Exception as e:
             self.show_error(f"Error importing file: {str(e)}")
+            print(f"Error importing file: {e}")
 
     def show_error(self, message):
-        """Show an error popup."""
-        from kivy.uix.popup import Popup
+        """Show an error dialog."""
+        if self.dialog:
+            self.dialog.dismiss()
 
-        content = BoxLayout(orientation='vertical', padding=dp(10))
-        content.add_widget(Label(text=message))
-        btn = Button(
-            text="OK",
-            size_hint_y=None,
-            height=dp(50),
-            on_release=lambda x: popup.dismiss()
-        )
-        content.add_widget(btn)
-
-        popup = Popup(
+        self.dialog = MDDialog(
             title="Error",
-            content=content,
-            size_hint=(0.8, 0.4)
+            text=message,
+            buttons=[
+                MDFlatButton(
+                    text="OK",
+                    theme_text_color="Custom",
+                    text_color=theme.ERROR_COLOR,
+                    on_release=lambda x: self.dialog.dismiss()
+                ),
+            ],
         )
-        popup.open()
+        self.dialog.open()
 
     def show_success(self, message):
-        """Show a success popup."""
-        from kivy.uix.popup import Popup
+        """Show a success dialog with options."""
+        if self.dialog:
+            self.dialog.dismiss()
 
-        content = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
-        content.add_widget(Label(text=message))
-
-        buttons = BoxLayout(
-            size_hint_y=None,
-            height=dp(50),
-            spacing=dp(10)
-        )
-
-        popup = Popup(
+        self.dialog = MDDialog(
             title="Success",
-            content=content,
-            size_hint=(0.8, 0.4),
-            auto_dismiss=True
+            text=message,
+            buttons=[
+                MDFlatButton(
+                    text="IMPORT ANOTHER",
+                    theme_text_color="Custom",
+                    text_color=theme.PRIMARY_COLOR,
+                    on_release=lambda x: self.dialog.dismiss()
+                ),
+                MDRaisedButton(
+                    text="GO TO RECORDINGS",
+                    theme_text_color="Custom",
+                    text_color=theme.TEXT_COLOR,
+                    md_bg_color=theme.SUCCESS_COLOR,
+                    on_release=lambda x: self.go_to_files(self.dialog)
+                ),
+            ],
         )
+        self.dialog.open()
 
-        import_another_btn = Button(
-            text="Import Another",
-            on_release=lambda x: popup.dismiss()
-        )
-        buttons.add_widget(import_another_btn)
-
-        go_to_files_btn = Button(
-            text="Go to Recordings",
-            on_release=lambda x: self.go_to_files(popup)
-        )
-        buttons.add_widget(go_to_files_btn)
-
-        content.add_widget(buttons)
-
-        popup.open()
-
-    def go_to_files(self, popup):
-        """Close the popup and go to the file list screen."""
-        popup.dismiss()
+    def go_to_files(self, dialog):
+        """Close the dialog and go to the file list screen."""
+        dialog.dismiss()
         app = App.get_running_app()
-        app.root.current = 'file_list'
+        app.root_layout.current = 'file_list'
 
     def go_back(self, instance):
-        """Navigate back to the previous screen."""
+        """Navigate back to the home screen."""
         app = App.get_running_app()
-        app.root.current = 'home'
+        app.root_layout.current = 'home'
