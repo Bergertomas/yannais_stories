@@ -2,11 +2,10 @@
 #:import theme theme
 
 <HomeScreen>:
-    # We'll let the starfield be added programmatically to ensure it's the bottom-most element
     BoxLayout:
         orientation: 'vertical'
-        padding: 20
-        spacing: 15
+        padding: dp(20)
+        spacing: dp(15)
 
         # Title section with "DreamTales"
         BoxLayout:
@@ -29,25 +28,26 @@
                 height: dp(30)
                 color: theme.SECONDARY_TEXT_COLOR
 
-        # "Choose Your Story" title
+        # Choose Your Story section
         Label:
             text: "Choose Your Story"
             size_hint_y: None
-            height: dp(50)
+            height: dp(40)
             font_size: dp(22)
-            halign: 'center'
+            halign: "center"
 
-        # Story grid with calming, toddler-friendly colors
+        # Story grid with cards
         GridLayout:
             id: story_grid
             cols: 2
-            spacing: 15
-            size_hint_y: 0.4
+            spacing: dp(15)
+            size_hint_y: None
+            height: dp(180)  # Smaller height to prevent overlap
 
-            # These are placeholder buttons that will be replaced dynamically
+            # These are placeholders that will be replaced dynamically
             Button:
                 text: "tryout_1"
-                background_color: theme.NAV_BLUE
+                background_color: theme.NAV_PURPLE
                 on_release: root.play_recording_by_title(self.text)
                 canvas.before:
                     Color:
@@ -55,7 +55,7 @@
                     RoundedRectangle:
                         pos: self.pos
                         size: self.size
-                        radius: [10]
+                        radius: [15]
 
             Button:
                 text: "tryout"
@@ -67,11 +67,11 @@
                     RoundedRectangle:
                         pos: self.pos
                         size: self.size
-                        radius: [10]
+                        radius: [15]
 
             Button:
                 text: "tryout"
-                background_color: theme.NAV_PURPLE
+                background_color: theme.NAV_GREEN
                 on_release: root.play_recording_by_title(self.text)
                 canvas.before:
                     Color:
@@ -79,85 +79,77 @@
                     RoundedRectangle:
                         pos: self.pos
                         size: self.size
-                        radius: [10]
+                        radius: [15]
 
-            Button:
-                text: "All Recordings"
-                background_color: theme.NAV_GREEN
-                on_release: root.navigate_to('file_list')
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [10]
-
-        # Small spacer
+        # Navigation section with more padding at top
         BoxLayout:
-            size_hint_y: 0.05
-
-        # Navigation buttons section
-        Label:
-            text: "Navigate To"
+            orientation: 'vertical'
             size_hint_y: None
-            height: dp(30)
-            font_size: dp(18)
-            color: theme.SECONDARY_TEXT_COLOR
+            height: dp(240)
+            padding: [0, dp(10), 0, 0]  # Added top padding
 
-        GridLayout:
-            cols: 2
-            spacing: 15
+            Label:
+                text: "Navigate To"
+                size_hint_y: None
+                height: dp(40)
+                font_size: dp(18)
+                halign: "center"
+
+            # Navigation buttons
+            GridLayout:
+                cols: 2
+                spacing: dp(15)
+                size_hint_y: None
+                height: dp(180)
+
+                Button:
+                    text: "All Recordings"
+                    background_color: theme.NAV_BLUE
+                    on_release: root.navigate_to('file_list')
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15]
+
+                Button:
+                    text: "Playlists"
+                    background_color: theme.NAV_GOLD
+                    on_release: root.navigate_to('playlist')
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15]
+
+                Button:
+                    text: "Import Audio"
+                    background_color: theme.NAV_GREEN
+                    on_release: root.navigate_to('import')
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15]
+
+                Button:
+                    text: "Settings"
+                    background_color: theme.NAV_PURPLE
+                    on_release: root.navigate_to('settings')
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15]
+
+        # Larger spacer before mini player to prevent overlap
+        Widget:
             size_hint_y: 0.25
-
-            Button:
-                text: "All Recordings"
-                background_color: theme.NAV_BLUE
-                on_release: root.navigate_to('file_list')
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [10]
-
-            Button:
-                text: "Playlists"
-                background_color: theme.NAV_GOLD
-                on_release: root.navigate_to('playlist')
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [10]
-
-            Button:
-                text: "Import Audio"
-                background_color: theme.NAV_GREEN
-                on_release: root.navigate_to('import')
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [10]
-
-            Button:
-                text: "Settings"
-                background_color: theme.NAV_PURPLE
-                on_release: root.navigate_to('settings')
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [10]
-
-        # Spacer before mini player
-        BoxLayout:
-            size_hint_y: 0.05

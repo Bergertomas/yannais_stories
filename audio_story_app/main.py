@@ -9,6 +9,9 @@ from kivy.uix.floatlayout import FloatLayout
 import os
 import theme
 
+# Import KivyMD components
+from kivymd.app import MDApp
+
 # Set minimum window size for desktop
 Config.set('graphics', 'minimum_width', '400')
 Config.set('graphics', 'minimum_height', '600')
@@ -71,15 +74,6 @@ class RootLayout(FloatLayout):
             self.rect = Rectangle(pos=self.pos, size=self.size)
         self.bind(pos=self._update_rect, size=self._update_rect)
 
-        # Import and add StarField
-        try:
-            from starfield import StarField
-            self.starfield = StarField()
-            self.add_widget(self.starfield)
-            print("Added StarField as background")
-        except Exception as e:
-            print(f"Error adding StarField: {e}")
-
         # Create screen manager
         self.sm = ScreenManager(transition=SlideTransition())
         print("Created ScreenManager")
@@ -104,6 +98,9 @@ class RootLayout(FloatLayout):
         # Set default screen
         self.sm.current = 'home'
         print(f"Set current screen to: {self.sm.current}")
+
+        # Import and add StarField - moved this to apply_theme
+        # This will be added in theme.py's apply_theme method
 
         # Add screen manager to the layout (takes full size)
         self.sm.size_hint = (1, 1)
@@ -146,7 +143,7 @@ class RootLayout(FloatLayout):
         return None
 
 
-class AudioStoryApp(App):
+class AudioStoryApp(MDApp):
     """Main application class for the Audio Story App."""
 
     def build(self):
@@ -154,11 +151,14 @@ class AudioStoryApp(App):
         print("Building AudioStoryApp")
 
         # Set app title
-        self.title = "Audio Story App"
+        self.title = "DreamTales"
 
-        # Apply theme
-        theme.apply_theme(self)
-        print("Applied theme")
+        # Configure theme colors
+        self.theme_cls.primary_palette = "BlueGray"
+        self.theme_cls.accent_palette = "Amber"
+        self.theme_cls.primary_hue = "700"
+        self.theme_cls.accent_hue = "500"
+        self.theme_cls.theme_style = "Dark"  # Use dark theme to match starry background
 
         # Create necessary directories
         self.ensure_directories()
@@ -184,12 +184,11 @@ class AudioStoryApp(App):
         # Create root layout
         try:
             self.root_layout = RootLayout()
-            from theme import StarField
-            # Create starfield and add it as the bottom-most widget
-            starfield = StarField()
-            self.root_layout.add_widget(starfield, index=len(self.root_layout.children))
-            print("Added starfield directly to root_layout")
             print("Created RootLayout")
+
+            # Apply theme - this will add the starfield
+            theme.apply_theme(self)
+            print("Applied theme")
         except Exception as e:
             print(f"Error creating RootLayout: {e}")
 
@@ -250,8 +249,11 @@ class AudioStoryApp(App):
             self.confirm_exit()
             return True
         elif current == 'playback':
-            # Go back but don't stop playback
-            self.root_layout.current = 'file_list'
+            # Get the playback screen to use its go_back method
+            # which has source_screen logic
+            playback_screen = self.root_layout.get_screen('playback')
+            if playback_screen:
+                playback_screen.go_back(None)
             return True
         else:
             # Navigate back to home
@@ -260,44 +262,28 @@ class AudioStoryApp(App):
 
     def confirm_exit(self):
         """Show exit confirmation dialog."""
-        from kivy.uix.popup import Popup
-        from kivy.uix.button import Button
-        from kivy.uix.boxlayout import BoxLayout
-        from kivy.uix.label import Label
-        from kivy.metrics import dp
+        from kivymd.uix.dialog import MDDialog
+        from kivymd.uix.button import MDFlatButton
 
-        content = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
-
-        content.add_widget(Label(text="Are you sure you want to exit?"))
-
-        buttons = BoxLayout(
-            size_hint_y=None,
-            height=dp(50),
-            spacing=dp(10)
-        )
-
-        popup = Popup(
+        dialog = MDDialog(
             title="Exit App",
-            content=content,
-            size_hint=(0.8, 0.3),
-            auto_dismiss=True
+            text="Are you sure you want to exit?",
+            buttons=[
+                MDFlatButton(
+                    text="CANCEL",
+                    theme_text_color="Custom",
+                    text_color=theme.PRIMARY_COLOR,
+                    on_release=lambda x: dialog.dismiss()
+                ),
+                MDFlatButton(
+                    text="EXIT",
+                    theme_text_color="Custom",
+                    text_color=theme.FLAX,
+                    on_release=lambda x: self.stop()
+                ),
+            ],
         )
-
-        cancel_btn = Button(
-            text="Cancel",
-            on_release=lambda x: popup.dismiss()
-        )
-        buttons.add_widget(cancel_btn)
-
-        exit_btn = Button(
-            text="Exit",
-            on_release=lambda x: self.stop()
-        )
-        buttons.add_widget(exit_btn)
-
-        content.add_widget(buttons)
-
-        popup.open()
+        dialog.open()
 
     def on_pause(self):
         """Handle app pause (for Android)."""

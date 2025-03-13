@@ -1,16 +1,90 @@
+#:kivy 2.0.0
+#:import theme theme
+
+
 <FileListScreen>:
     BoxLayout:
         orientation: 'vertical'
-        Button:
-            text: 'Back to Home'
-            background_color: (0.8, 0.2, 0.2, 1)  # Reddish
+        
+        # Header with back button and title
+        BoxLayout:
             size_hint_y: None
-            height: 50
-            on_press: root.manager.current = 'home'
+            height: dp(50)
+            padding: dp(10)
+            spacing: dp(10)
+            
+            Button:
+                text: 'Back'
+                size_hint_x: None
+                width: dp(80)
+                background_normal: ''
+                background_color: theme.PRIMARY_COLOR
+                on_release: root.go_back(self)
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [10]
+            
+            Label:
+                text: 'All Recordings'
+                font_size: dp(20)
+                
+        # Search Bar
+        BoxLayout:
+            size_hint_y: None
+            height: dp(60)
+            padding: dp(10)
+            spacing: dp(10)
+            
+            TextInput:
+                id: search_input
+                hint_text: 'Search recordings...'
+                multiline: False
+                size_hint_x: 0.7
+                on_text_validate: root.search_recordings()
+                
+            Button:
+                text: 'Search'
+                size_hint_x: 0.3
+                background_normal: ''
+                background_color: theme.PRIMARY_COLOR
+                on_release: root.search_recordings()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [10]
+                
+        # Recordings list
         ScrollView:
             BoxLayout:
                 id: recordings_list
                 orientation: 'vertical'
                 size_hint_y: None
                 height: self.minimum_height
-                spacing: 10  # Space between recording items
+                spacing: dp(10)
+                padding: dp(10)
+                
+        # Import button at bottom
+        BoxLayout:
+            size_hint_y: None
+            height: dp(60)
+            padding: dp(10)
+            
+            Button:
+                text: 'Import New Recording'
+                background_normal: ''
+                background_color: theme.SUCCESS_COLOR
+                on_release: root.go_to_import(self)
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [10]

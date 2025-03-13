@@ -1,0 +1,201 @@
+#:kivy 2.0.0
+#:import theme theme
+
+<PlaybackScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(15)
+        spacing: dp(15)
+
+        # Header with back button and title
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+            padding: [0, 0, dp(80), 0]  # Add right padding to balance the title
+
+            Button:
+                text: "Back"
+                size_hint_x: None
+                width: dp(80)
+                background_normal: ''
+                background_color: theme.PRIMARY_COLOR
+                on_release: root.go_back()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+            Label:
+                id: title_label
+                text: "Now Playing"
+                font_size: dp(20)
+                halign: "center"
+                valign: "middle"
+                text_size: self.size
+
+        # Recording info section
+        BoxLayout:
+            orientation: 'vertical'
+            padding: dp(10)
+            size_hint_y: None
+            height: dp(100)
+
+            # Description label
+            Label:
+                id: description_label
+                text: ""
+                size_hint_y: None
+                height: dp(60)
+                halign: 'center'
+                valign: 'middle'
+
+            # Date created
+            Label:
+                id: date_label
+                text: ""
+                size_hint_y: None
+                height: dp(30)
+                font_size: dp(14)
+
+        # Spacer
+        Widget:
+            size_hint_y: 0.2
+
+        # Time and position slider
+        BoxLayout:
+            size_hint_y: None
+            height: dp(30)
+
+            Label:
+                id: time_label
+                text: "00:00 / 00:00"
+                size_hint_x: 1.0
+
+        # Position slider
+        Slider:
+            id: position_slider
+            min: 0
+            max: 100
+            value: 0
+            size_hint_y: None
+            height: dp(30)
+            cursor_size: dp(20), dp(20)
+            on_touch_down: root.on_slider_touch_down(*args)
+            on_touch_up: root.on_slider_touch_up(*args)
+
+        # Playback buttons
+        BoxLayout:
+            size_hint_y: None
+            height: dp(70)
+            spacing: dp(20)
+            padding: [dp(20), 0]
+
+            # Rewind button
+            Button:
+                text: "<<"
+                font_size: dp(24)
+                background_normal: ''
+                background_color: theme.PRIMARY_COLOR
+                on_release: root.rewind()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+            # Play/Pause button
+            Button:
+                id: play_pause_btn
+                text: "Play"
+                font_size: dp(24)
+                background_normal: ''
+                background_color: theme.ACCENT_COLOR
+                on_release: root.toggle_play_pause()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+            # Forward button
+            Button:
+                text: ">>"
+                font_size: dp(24)
+                background_normal: ''
+                background_color: theme.PRIMARY_COLOR
+                on_release: root.forward()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+        # Additional control buttons
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(20)
+            padding: [dp(20), 0]
+
+            # Repeat button
+            Button:
+                id: repeat_btn
+                text: "Repeat"
+                font_size: dp(16)
+                background_normal: ''
+                background_color: theme.SURFACE_COLOR
+                on_release: root.toggle_repeat()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+            # Add to playlist button
+            Button:
+                text: "Add to Playlist"
+                font_size: dp(16)
+                background_normal: ''
+                background_color: theme.SURFACE_COLOR
+                on_release: root.add_to_playlist()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15]
+
+        # Volume slider
+        BoxLayout:
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+
+            Label:
+                text: "Volume"
+                font_size: dp(16)
+                size_hint_x: 0.2
+
+            Slider:
+                min: 0
+                max: 1
+                value: 0.8
+                size_hint_x: 0.8
+                on_value: root.on_volume_change(self, self.value)
+
+        # Add a spacer at the bottom to push content up
+        Widget:
+            size_hint_y: 0.1

@@ -1,17 +1,18 @@
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.progressbar import ProgressBar
-from kivy.metrics import dp
+from kivy.properties import ObjectProperty, StringProperty, BooleanProperty, NumericProperty
 from kivy.app import App
 from kivy.clock import Clock
-from kivy.properties import ObjectProperty, StringProperty, BooleanProperty, NumericProperty
+from kivy.metrics import dp
 import os
 import theme
-from kivy.graphics import Color, RoundedRectangle
+
+from kivymd.uix.button import MDIconButton
+from kivymd.uix.label import MDLabel
+from kivymd.uix.progressbar import MDProgressBar
+from kivymd.uix.card import MDCard
 
 
-class MiniPlayer(BoxLayout):
+class MiniPlayer(MDCard):
     """Floating playback controls that appear when audio is playing."""
 
     title = StringProperty("Not Playing")
@@ -23,93 +24,62 @@ class MiniPlayer(BoxLayout):
         super(MiniPlayer, self).__init__(**kwargs)
         self.orientation = 'horizontal'
         self.size_hint_y = None
-        self.height = dp(60)
-        self.padding = [dp(10), dp(5)]
-        self.spacing = dp(10)
+        self.height = dp(70)
+        self.padding = [dp(8), dp(8)]
+        self.spacing = dp(8)
+        self.radius = [dp(12), dp(12), 0, 0]  # Rounded corners on the top only
+        self.elevation = 6  # Add shadow for depth
 
-        # Set initial opacity based on whether anything is playing
-        self.opacity = 1  # Always visible for testing
-
-        # Add background
-        self.canvas.before.clear()
-        with self.canvas.before:
-            from kivy.graphics import Color, RoundedRectangle
-            Color(*theme.SURFACE_COLOR)
-            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
-            Color(0.2, 0.2, 0.2, 1)
-            self.border = RoundedRectangle(pos=self.pos, size=(self.width, dp(1)), radius=[dp(10)])
-
-        # Bind size/pos changes to update rectangles
-        self.bind(pos=self.update_rect, size=self.update_rect)
+        # Use theme colors (safe fallback to RGB tuple if md_bg_color causes issues)
+        self.md_bg_color = theme.SURFACE_COLOR
 
         # Title label
-        self.title_label = Label(
+        self.title_label = MDLabel(
             text=self.title,
             size_hint_x=0.5,
             halign='left',
-            valign='middle',
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
             shorten=True,
             shorten_from='right'
         )
-        self.title_label.bind(size=self.title_label.setter('text_size'))
         self.add_widget(self.title_label)
 
         # Progress bar
-        self.progress_bar = ProgressBar(
+        self.progress_bar = MDProgressBar(
             max=self.max_progress,
             value=self.progress,
-            size_hint_x=0.2
+            size_hint_x=0.2,
+            color=theme.ACCENT_COLOR
         )
         self.add_widget(self.progress_bar)
 
-        # Play/pause button - use simple text instead of Unicode
-        self.play_pause_btn = Button(
-            text="Play",  # Simple text
-            size_hint_x=0.15,
-            font_size=dp(14),
-            background_normal='',
-            background_color=theme.NAV_GOLD,  # Calming gold color
+        # Play/pause button
+        self.play_pause_btn = MDIconButton(
+            icon="play",
+            size_hint_x=None,
+            width=dp(48),
+            icon_size=dp(24),  # Use icon_size instead of user_font_size
+            theme_text_color="Custom",
+            text_color=theme.ACCENT_COLOR,
             on_release=self.toggle_play_pause
         )
-        self.apply_rounded_style(self.play_pause_btn, theme.NAV_GOLD)
         self.add_widget(self.play_pause_btn)
 
         # Go to playback screen button
-        self.goto_btn = Button(
-            text="Open",
-            size_hint_x=0.15,
-            background_normal='',
-            background_color=theme.NAV_BLUE,  # Calming blue color
+        self.goto_btn = MDIconButton(
+            icon="arrow-expand-up",
+            size_hint_x=None,
+            width=dp(48),
+            icon_size=dp(24),  # Use icon_size instead of user_font_size
+            theme_text_color="Custom",
+            text_color=theme.PRIMARY_COLOR,
             on_release=self.goto_playback
         )
-        self.apply_rounded_style(self.goto_btn, theme.NAV_BLUE)
         self.add_widget(self.goto_btn)
 
         # Schedule updates
         self.update_event = Clock.schedule_interval(self.update_state, 0.5)
-
-    def apply_rounded_style(self, button, color):
-        """Apply rounded style to a button."""
-        button.canvas.before.clear()
-        with button.canvas.before:
-            Color(*color)
-            button._rect = RoundedRectangle(pos=button.pos, size=button.size, radius=[dp(10)])
-        button.bind(pos=self.update_button_rect, size=self.update_button_rect)
-
-    def update_button_rect(self, instance, value):
-        """Update button rectangle on size/pos changes."""
-        if hasattr(instance, '_rect'):
-            instance._rect.pos = instance.pos
-            instance._rect.size = instance.size
-
-    def update_rect(self, *args):
-        """Update background rectangle on size/pos changes."""
-        if hasattr(self, 'rect'):
-            self.rect.pos = self.pos
-            self.rect.size = self.size
-        if hasattr(self, 'border'):
-            self.border.pos = self.pos
-            self.border.size = (self.width, dp(1))
 
     def update_state(self, dt):
         """Update player state based on app's audio player."""
@@ -134,8 +104,8 @@ class MiniPlayer(BoxLayout):
                 # Update is_playing state
                 self.is_playing = app.player.is_playing
 
-                # Update play/pause button text
-                self.play_pause_btn.text = "Pause" if self.is_playing else "Play"
+                # Update play/pause button icon
+                self.play_pause_btn.icon = "pause" if self.is_playing else "play"
 
                 # Update progress
                 if app.player.duration > 0:
@@ -160,10 +130,10 @@ class MiniPlayer(BoxLayout):
             print(f"Mini player: Toggle play/pause, current state: {app.player.is_playing}")
             if app.player.is_playing:
                 app.player.pause()
-                self.play_pause_btn.text = "Play"
+                self.play_pause_btn.icon = "play"
             else:
                 app.player.play()
-                self.play_pause_btn.text = "Pause"
+                self.play_pause_btn.icon = "pause"
         except Exception as e:
             print(f"Error toggling play/pause in mini player: {e}")
 

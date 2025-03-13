@@ -1,12 +1,13 @@
 [app]
-title = Audio Story App
-package.name = audiostoryapp
+title = DreamTales
+package.name = dreamtales
 package.domain = org.yourdomain
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,wav,mp3
 version = 1.0
 
-requirements = python3,kivy,pyjnius
+# Updated requirements with KivyMD
+requirements = python3,kivy,pyjnius,kivymd==1.1.1
 
 # Indicate that we need the MediaPlayer feature
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE

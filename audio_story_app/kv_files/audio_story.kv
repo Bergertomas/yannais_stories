@@ -1,13 +1,6 @@
 #:kivy 2.0.0
 #:import theme theme
-
-<ScreenManager>:
-    canvas.before:
-        Color:
-            rgba: 0, 0, 0, 0  # Transparent
-        Rectangle:
-            pos: self.pos
-            size: self.size
+#:import custom_widgets custom_widgets
 
 <FixedWidthView@BoxLayout>:
     orientation: 'vertical'
@@ -16,7 +9,7 @@
     size_hint: (1, 1)
     canvas.before:
         Color:
-            rgba: 0, 0, 0, 0  # Transparent
+            rgba: theme.BACKGROUND_COLOR
         Rectangle:
             pos: self.pos
             size: self.size
@@ -44,7 +37,12 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [10]
+            radius: [15]
+
+<StylishButton>:
+    font_size: theme.FONT_SIZE_REGULAR
+    size_hint_y: None
+    height: theme.BUTTON_HEIGHT_REGULAR
 
 <TextInput>:
     font_size: theme.FONT_SIZE_REGULAR
@@ -72,6 +70,14 @@
     effect_cls: "ScrollEffect"
     scroll_type: ['bars']
 
+<ScreenManager>:
+    canvas.before:
+        Color:
+            rgba: 0, 0, 0, 0  # Transparent background
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
 # Define playback button styles
 <PlaybackButton@Button>:
     background_normal: ''
@@ -84,4 +90,4 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [10]
+            radius: [15]
