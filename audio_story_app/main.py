@@ -1,4 +1,5 @@
 from kivy.app import App
+from kivy.graphics import Rectangle, Color, Ellipse
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.core.window import Window
 from kivy.utils import platform
@@ -7,25 +8,41 @@ from kivy.lang import Builder
 from kivy.uix.floatlayout import FloatLayout
 import os
 import theme
-import time
-from datetime import datetime
-
 
 # Set minimum window size for desktop
 Config.set('graphics', 'minimum_width', '400')
 Config.set('graphics', 'minimum_height', '600')
 
-# Load KV file
+# Try to directly load the KV files we know should exist
 try:
-    # Try to load the enhanced KV file
     Builder.load_file('kv_files/audio_story.kv')
+    print("Loaded audio_story.kv")
 except Exception as e:
-    print(f"Error loading enhanced KV file: {e}")
-    try:
-        # Fall back to original KV file
-        Builder.load_file('kv_files/audio_story.kv')
-    except Exception as e:
-        print(f"Error loading KV file: {e}")
+    print(f"Error loading audio_story.kv: {e}")
+
+try:
+    Builder.load_file('kv_files/home_screen.kv')
+    print("Loaded home_screen.kv")
+except Exception as e:
+    print(f"Error loading home_screen.kv: {e}")
+
+try:
+    Builder.load_file('kv_files/file_list_screen.kv')
+    print("Loaded file_list_screen.kv")
+except Exception as e:
+    print(f"Error loading file_list_screen.kv: {e}")
+
+try:
+    Builder.load_file('kv_files/playlist_screen.kv')
+    print("Loaded playlist_screen.kv")
+except Exception as e:
+    print(f"Error loading playlist_screen.kv: {e}")
+
+try:
+    Builder.load_file('kv_files/settings_screen.kv')
+    print("Loaded settings_screen.kv")
+except Exception as e:
+    print(f"Error loading settings_screen.kv: {e}")
 
 # Import database and player
 from database import Database
@@ -33,12 +50,12 @@ from player import player as global_player
 from mini_player import MiniPlayer
 
 # Import screens
-from screens.home_screen import DreamTalesHomeScreen
+from screens.home_screen import HomeScreen
 from screens.file_list_screen import FileListScreen
 from screens.import_screen import ImportScreen
 from screens.playlist_screen import PlaylistScreen
 from screens.settings_screen import SettingsScreen
-
+from screens.playback_screen import PlaybackScreen
 
 
 class RootLayout(FloatLayout):
@@ -46,30 +63,67 @@ class RootLayout(FloatLayout):
 
     def __init__(self, **kwargs):
         super(RootLayout, self).__init__(**kwargs)
+        print("Initializing RootLayout")
+
+        # Create a transparent background for the entire layout
+        with self.canvas.before:
+            Color(0, 0, 0, 0)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+        # Import and add StarField
+        try:
+            from starfield import StarField
+            self.starfield = StarField()
+            self.add_widget(self.starfield)
+            print("Added StarField as background")
+        except Exception as e:
+            print(f"Error adding StarField: {e}")
 
         # Create screen manager
         self.sm = ScreenManager(transition=SlideTransition())
+        print("Created ScreenManager")
 
         # Add screens
-        self.sm.add_widget(DreamTalesHomeScreen(name='home'))
-        self.sm.add_widget(FileListScreen(name='file_list'))
-        self.sm.add_widget(ImportScreen(name='import'))
-        self.sm.add_widget(PlaylistScreen(name='playlist'))
-        self.sm.add_widget(SettingsScreen(name='settings'))
+        try:
+            self.sm.add_widget(HomeScreen(name='home'))
+            print("Added HomeScreen")
+            self.sm.add_widget(FileListScreen(name='file_list'))
+            print("Added FileListScreen")
+            self.sm.add_widget(ImportScreen(name='import'))
+            print("Added ImportScreen")
+            self.sm.add_widget(PlaylistScreen(name='playlist'))
+            print("Added PlaylistScreen")
+            self.sm.add_widget(SettingsScreen(name='settings'))
+            print("Added SettingsScreen")
+            self.sm.add_widget(PlaybackScreen(name='playback'))
+            print("Added PlaybackScreen")
+        except Exception as e:
+            print(f"Error adding screens: {e}")
 
-        # Use our updated playback screen
-        from screens.playback_screen import PlaybackScreen
-        self.sm.add_widget(PlaybackScreen(name='playback'))
+        # Set default screen
+        self.sm.current = 'home'
+        print(f"Set current screen to: {self.sm.current}")
 
         # Add screen manager to the layout (takes full size)
         self.sm.size_hint = (1, 1)
         self.add_widget(self.sm)
+        print("Added ScreenManager to RootLayout")
 
         # Create mini player (will be at the bottom of screen)
-        self.mini_player = MiniPlayer()
-        self.mini_player.pos_hint = {'x': 0, 'bottom': 0}
-        self.mini_player.size_hint_x = 1
-        self.add_widget(self.mini_player)
+        try:
+            self.mini_player = MiniPlayer()
+            self.mini_player.pos_hint = {'x': 0, 'bottom': 0}
+            self.mini_player.size_hint_x = 1
+            self.add_widget(self.mini_player)
+            print("Added MiniPlayer to RootLayout")
+        except Exception as e:
+            print(f"Error adding mini player: {e}")
+
+    def _update_rect(self, instance, value):
+        """Update the background rectangle when size changes"""
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
 
     @property
     def current(self):
@@ -81,6 +135,7 @@ class RootLayout(FloatLayout):
         """Allow setting the current screen."""
         if self.sm.has_screen(value):
             self.sm.current = value
+            print(f"Changed screen to: {value}")
         else:
             print(f"Screen {value} does not exist")
 
@@ -96,37 +151,51 @@ class AudioStoryApp(App):
 
     def build(self):
         """Build and return the app's UI."""
+        print("Building AudioStoryApp")
+
         # Set app title
         self.title = "Audio Story App"
 
         # Apply theme
         theme.apply_theme(self)
+        print("Applied theme")
 
         # Create necessary directories
         self.ensure_directories()
+        print("Ensured directories")
 
         # Initialize database
         db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'audio_story.db')
         self.database = Database(db_path)
+        print("Initialized database")
 
         # Set up audio player
         self.player = global_player
+        print("Set up audio player")
 
         # Set default volume from settings
         try:
             default_volume = float(self.database.get_setting('default_volume', '0.8'))
             self.player.set_volume(default_volume)
+            print(f"Set default volume: {default_volume}")
         except Exception as e:
             print(f"Error setting default volume: {e}")
 
-        # Automatically scan and import recordings from the recordings directory
-        self.auto_import_recordings()
-
         # Create root layout
-        self.root_layout = RootLayout()
+        try:
+            self.root_layout = RootLayout()
+            from theme import StarField
+            # Create starfield and add it as the bottom-most widget
+            starfield = StarField()
+            self.root_layout.add_widget(starfield, index=len(self.root_layout.children))
+            print("Added starfield directly to root_layout")
+            print("Created RootLayout")
+        except Exception as e:
+            print(f"Error creating RootLayout: {e}")
 
         # Set up keyboard/back button handling
         self.bind_keys()
+        print("Bound keys")
 
         return self.root_layout
 
@@ -139,117 +208,8 @@ class AudioStoryApp(App):
         os.makedirs(data_dir, exist_ok=True)
 
         # Recordings directory
-        self.recordings_dir = os.path.join(data_dir, 'recordings')
-        os.makedirs(self.recordings_dir, exist_ok=True)
-
-    def auto_import_recordings(self):
-        """Automatically scan the recordings directory and import any new files with proper duration detection."""
-        print("Scanning recordings directory for new files...")
-
-        if not hasattr(self, 'recordings_dir') or not os.path.exists(self.recordings_dir):
-            print("Recordings directory not found")
-            return
-
-        # Get all existing recordings in the database
-        existing_recordings = self.database.get_all_recordings()
-        existing_filepaths = [rec[3] for rec in existing_recordings]  # filepath is at index 3
-
-        # Count for imported files
-        imported_count = 0
-        updated_count = 0
-
-        # Define supported audio extensions
-        supported_extensions = ['.mp3', '.wav', '.ogg', '.m4a']
-
-        # First, check for recordings with missing duration
-        for recording in existing_recordings:
-            recording_id, title, description, filepath, duration, date_created, cover_art = recording
-
-            # If duration is missing or zero, try to detect it
-            if duration is None or duration <= 0:
-                if os.path.exists(filepath):
-                    try:
-                        from kivy.core.audio import SoundLoader
-                        sound = SoundLoader.load(filepath)
-
-                        if sound:
-                            # Get and update duration
-                            new_duration = sound.length
-                            sound.unload()  # Free resources
-
-                            if new_duration > 0:
-                                # Update the database with the correct duration
-                                self.database.update_recording(
-                                    recording_id=recording_id,
-                                    duration=new_duration
-                                )
-                                updated_count += 1
-                                print(f"Updated duration for '{title}': {new_duration} seconds")
-                    except Exception as e:
-                        print(f"Error updating duration for {filepath}: {e}")
-
-        # Now check for any new files to import
-        for filename in os.listdir(self.recordings_dir):
-            filepath = os.path.join(self.recordings_dir, filename)
-
-            # Skip directories and non-audio files
-            if os.path.isdir(filepath):
-                continue
-
-            file_ext = os.path.splitext(filename)[1].lower()
-            if file_ext not in supported_extensions:
-                continue
-
-            # Skip files already in the database
-            if filepath in existing_filepaths:
-                continue
-
-            try:
-                # Use filename as title (without extension)
-                title = os.path.splitext(filename)[0]
-
-                # Try to get duration using SoundLoader
-                from kivy.core.audio import SoundLoader
-                sound = SoundLoader.load(filepath)
-
-                duration = 0
-                if sound:
-                    # Get duration
-                    duration = sound.length
-                    # Unload the sound to free resources
-                    sound.unload()
-                    print(f"Detected duration for {filename}: {duration} seconds")
-                else:
-                    print(f"Could not detect duration for {filename}, using 0")
-
-                # Create a file modified date
-                file_stats = os.stat(filepath)
-                last_modified = datetime.fromtimestamp(file_stats.st_mtime).isoformat()
-
-                # Add to database with detected duration
-                self.database.add_recording(
-                    title=title,
-                    description="Auto-imported recording",
-                    filepath=filepath,
-                    duration=duration,  # Now we have the actual duration
-                    cover_art=None
-                )
-
-                imported_count += 1
-                print(f"Auto-imported: {filename}")
-
-            except Exception as e:
-                print(f"Error auto-importing {filename}: {e}")
-
-        if imported_count > 0 or updated_count > 0:
-            message = []
-            if imported_count > 0:
-                message.append(f"Auto-imported {imported_count} new recording(s)")
-            if updated_count > 0:
-                message.append(f"Updated duration for {updated_count} recording(s)")
-            print(", ".join(message))
-        else:
-            print("No new recordings found to import")
+        recordings_dir = os.path.join(data_dir, 'recordings')
+        os.makedirs(recordings_dir, exist_ok=True)
 
     def bind_keys(self):
         """Set up keyboard and back button handling."""
@@ -351,8 +311,7 @@ class AudioStoryApp(App):
 
     def on_resume(self):
         """Handle app resume (for Android)."""
-        # Scan for new recordings when app is resumed
-        self.auto_import_recordings()
+        pass
 
     def on_stop(self):
         """Clean up resources when the app stops."""

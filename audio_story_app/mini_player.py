@@ -62,16 +62,16 @@ class MiniPlayer(BoxLayout):
         )
         self.add_widget(self.progress_bar)
 
-        # Play/pause button
+        # Play/pause button - use simple text instead of Unicode
         self.play_pause_btn = Button(
-            text="▶" if not self.is_playing else "⏸",
+            text="Play",  # Simple text
             size_hint_x=0.15,
-            font_size=dp(18),
+            font_size=dp(14),
             background_normal='',
-            background_color=theme.ACCENT_COLOR,
+            background_color=theme.NAV_GOLD,  # Calming gold color
             on_release=self.toggle_play_pause
         )
-        self.apply_rounded_style(self.play_pause_btn, theme.ACCENT_COLOR)
+        self.apply_rounded_style(self.play_pause_btn, theme.NAV_GOLD)
         self.add_widget(self.play_pause_btn)
 
         # Go to playback screen button
@@ -79,10 +79,10 @@ class MiniPlayer(BoxLayout):
             text="Open",
             size_hint_x=0.15,
             background_normal='',
-            background_color=theme.PRIMARY_COLOR,
+            background_color=theme.NAV_BLUE,  # Calming blue color
             on_release=self.goto_playback
         )
-        self.apply_rounded_style(self.goto_btn, theme.PRIMARY_COLOR)
+        self.apply_rounded_style(self.goto_btn, theme.NAV_BLUE)
         self.add_widget(self.goto_btn)
 
         # Schedule updates
@@ -128,12 +128,14 @@ class MiniPlayer(BoxLayout):
                 if app.player.current_file:
                     filename = os.path.basename(app.player.current_file)
                     self.title = filename
+                    # Set title_label text directly in case binding isn't working
+                    self.title_label.text = filename
 
                 # Update is_playing state
                 self.is_playing = app.player.is_playing
 
-                # Update play/pause button
-                self.play_pause_btn.text = "⏸" if self.is_playing else "▶"
+                # Update play/pause button text
+                self.play_pause_btn.text = "Pause" if self.is_playing else "Play"
 
                 # Update progress
                 if app.player.duration > 0:
@@ -142,9 +144,9 @@ class MiniPlayer(BoxLayout):
                     self.progress_bar.max = app.player.duration
                     self.progress_bar.value = app.player.current_pos
             else:
-                if self.opacity > 0:
-                    print("Mini player: No sound loaded, hiding mini player")
-                self.opacity = 0
+                # Keep visible but show "Not Playing"
+                self.title = "Not Playing"
+                self.title_label.text = "Not Playing"
         except Exception as e:
             print(f"Error updating mini player: {e}")
 
@@ -158,10 +160,10 @@ class MiniPlayer(BoxLayout):
             print(f"Mini player: Toggle play/pause, current state: {app.player.is_playing}")
             if app.player.is_playing:
                 app.player.pause()
-                self.play_pause_btn.text = "▶"
+                self.play_pause_btn.text = "Play"
             else:
                 app.player.play()
-                self.play_pause_btn.text = "⏸"
+                self.play_pause_btn.text = "Pause"
         except Exception as e:
             print(f"Error toggling play/pause in mini player: {e}")
 

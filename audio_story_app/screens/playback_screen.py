@@ -402,26 +402,25 @@ class PlaybackScreen(Screen):
         self.play_pause_btn = None
         self.update_event = None
         self.is_slider_being_dragged = False
-        self.is_track_finished = False
-        self.repeat_button = None
-        self.continue_button = None
-
-        # Build the UI
+        self.description_label = None
+        self.date_label = None
+        self.repeat_enabled = False
+        self.repeat_btn = None  # Add this line
+        self._handling_track_finish = False  # Add this line
+        self.current_playlist_id = None
+        # Build UI during initialization
         self.build_ui()
 
     def on_enter(self):
-        """Called when screen is entered."""
-        # Reset track finished state
-        self.is_track_finished = False
-
-        # Start UI updates
+        """Called when the screen is entered."""
+        # Start the UI update timer
         if not self.update_event:
             self.update_event = Clock.schedule_interval(self.update_ui, 0.1)
 
-        # Update button states
+        # Update the UI based on current playback state
         self.update_play_pause_button()
 
-        # Connect to track finished event
+        # Register for track finished event
         app = App.get_running_app()
         if app.player:
             app.player.bind(on_track_finished=self.on_track_finished)
@@ -541,9 +540,10 @@ class PlaybackScreen(Screen):
             padding=[dp(20), 0]
         )
 
+        # Use text labels that clearly show the button purpose instead of Unicode
         # Rewind button
         rewind_btn = Button(
-            text="⏮",
+            text="<<",  # Use regular text instead of Unicode
             font_size=dp(24),
             background_normal='',
             background_color=theme.PRIMARY_COLOR,
@@ -554,7 +554,7 @@ class PlaybackScreen(Screen):
 
         # Play/Pause button
         self.play_pause_btn = Button(
-            text="▶",
+            text="Play",  # Start with simple text
             font_size=dp(24),
             background_normal='',
             background_color=theme.ACCENT_COLOR,
@@ -565,7 +565,7 @@ class PlaybackScreen(Screen):
 
         # Forward button
         forward_btn = Button(
-            text="⏭",
+            text=">>",  # Use regular text instead of Unicode
             font_size=dp(24),
             background_normal='',
             background_color=theme.PRIMARY_COLOR,
@@ -586,8 +586,8 @@ class PlaybackScreen(Screen):
 
         # Repeat button
         self.repeat_btn = Button(
-            text="🔁",
-            font_size=dp(20),
+            text="Repeat",  # Use regular text
+            font_size=dp(16),
             background_normal='',
             background_color=theme.SURFACE_COLOR,
             on_release=self.toggle_repeat
@@ -597,8 +597,8 @@ class PlaybackScreen(Screen):
 
         # Add to playlist button
         playlist_btn = Button(
-            text="📋",
-            font_size=dp(20),
+            text="Playlist",  # Use regular text
+            font_size=dp(16),
             background_normal='',
             background_color=theme.SURFACE_COLOR,
             on_release=self.add_to_playlist
@@ -616,8 +616,8 @@ class PlaybackScreen(Screen):
         )
 
         volume_label = Label(
-            text="🔊",
-            font_size=dp(20),
+            text="Volume",
+            font_size=dp(16),
             size_hint_x=0.2
         )
         volume_layout.add_widget(volume_label)
@@ -630,7 +630,6 @@ class PlaybackScreen(Screen):
         )
         volume_slider.bind(value=self.on_volume_change)
         volume_layout.add_widget(volume_slider)
-
         controls_layout.add_widget(volume_layout)
 
         main_layout.add_widget(controls_layout)
@@ -647,7 +646,6 @@ class PlaybackScreen(Screen):
             Color(*color)
             button._rect = RoundedRectangle(pos=button.pos, size=button.size, radius=[dp(10)])
         button.bind(pos=self.update_button_rect, size=self.update_button_rect)
-
 
     def update_button_rect(self, instance, value):
         """Update button rectangle on size/pos changes."""
@@ -681,15 +679,22 @@ class PlaybackScreen(Screen):
 
     def toggle_repeat(self, instance):
         """Toggle repeat mode."""
+        # Ensure the attribute exists
+        if not hasattr(self, 'repeat_enabled'):
+            self.repeat_enabled = False
+
+        # Toggle the repeat mode
         self.repeat_enabled = not self.repeat_enabled
+
+        # Update button appearance
         if self.repeat_enabled:
             self.repeat_btn.background_color = theme.ACCENT_COLOR
             self.apply_rounded_style(self.repeat_btn, theme.ACCENT_COLOR)
+            print("Repeat mode enabled")
         else:
             self.repeat_btn.background_color = theme.SURFACE_COLOR
             self.apply_rounded_style(self.repeat_btn, theme.SURFACE_COLOR)
-
-        print(f"Repeat mode: {'enabled' if self.repeat_enabled else 'disabled'}")
+            print("Repeat mode disabled")
 
     def update_playback_info(self, recording):
         """Update the UI with recording information."""
@@ -778,25 +783,18 @@ class PlaybackScreen(Screen):
             print(f"Error updating UI: {e}")
 
     def update_play_pause_button(self):
-        """Update play/pause button based on playback state."""
+        """Update the play/pause button text based on playback state."""
         app = App.get_running_app()
         try:
-            # Update the icon type based on playing state
             if app.player and app.player.is_playing:
-                self.play_pause_btn.icon_type = 'pause'
+                self.play_pause_btn.text = "Pause"  # Simple text that will definitely work
             else:
-                self.play_pause_btn.icon_type = 'play'
-
-            # Update the button canvas
-            self.play_pause_btn.canvas.after.clear()
-            with self.play_pause_btn.canvas.after:
-                self.play_pause_btn.draw_icon()
-
+                self.play_pause_btn.text = "Play"  # Simple text that will definitely work
         except Exception as e:
             print(f"Error updating play/pause button: {e}")
 
     def toggle_play_pause(self, instance):
-        """Toggle play/pause state with proper handling for track completion."""
+        """Toggle between play and pause states."""
         app = App.get_running_app()
 
         if not app.player or not app.player.sound:
@@ -804,25 +802,15 @@ class PlaybackScreen(Screen):
             return
 
         try:
-            if self.is_track_finished:
-                # If track is finished, reload and restart
-                print("Track finished - reloading and restarting")
-                if self.current_recording:
-                    filepath = self.current_recording[3]
-                    if app.player.load(filepath):
-                        app.player.play()
-                        self.is_track_finished = False
-                        self.update_play_pause_button()
-                    else:
-                        print("Failed to reload file for restart")
-            elif app.player.is_playing:
-                print("Pausing playback")
+            if app.player.is_playing:
+                print("Pausing playback via button press")
                 app.player.pause()
-                self.update_play_pause_button()
             else:
-                print("Starting/resuming playback")
+                print("Starting/resuming playback via button press")
                 app.player.play()
-                self.update_play_pause_button()
+
+            # Update button immediately
+            self.update_play_pause_button()
 
         except Exception as e:
             print(f"Error toggling play/pause: {e}")
@@ -984,27 +972,28 @@ class PlaybackScreen(Screen):
             file_list_screen.show_playlist_options(recording_id)
 
     def on_track_finished(self, *args):
-        """Handle track completion with proper repeat/continue functionality."""
-        print("Track finished event received in playback screen")
+        """Handle track completion event."""
+        try:
+            print("Track finished event received in playback screen")
 
-        # Only process if not already in finished state
-        if not self.is_track_finished:
-            self.is_track_finished = True
+            # First check if repeat mode is enabled
+            if hasattr(self, 'repeat_enabled') and self.repeat_enabled:
+                print("Repeat enabled, restarting track")
+                app = App.get_running_app()
+                if app.player and app.player.sound:
+                    # Schedule the restart for the next frame to avoid VLC issues
+                    Clock.schedule_once(lambda dt: app.player.play(), 0.1)
 
-            if self.repeat_button.state == 'down':
-                print("Repeat enabled - restarting track")
-                self.restart_track()
-                return
+            # If not repeating, try to play next track in playlist
+            elif hasattr(self, 'current_playlist_id') and self.current_playlist_id:
+                success = self.play_next_in_playlist()
+                if not success:
+                    print("No next track available or error playing next track")
+            else:
+                print("Repeat not enabled and not in playlist, track will remain stopped")
 
-            if self.continue_button.state == 'down':
-                print("Continue enabled - playing next track")
-                self.play_next_track()
-                return
-
-            # Otherwise, just update UI to show finished state
-            self.update_play_pause_button()
-        else:
-            print("Ignoring duplicate track finished event")
+        except Exception as e:
+            print(f"Error handling track finished: {e}")
 
     def restart_track(self):
         """Restart the current track from beginning."""
@@ -1020,6 +1009,43 @@ class PlaybackScreen(Screen):
                 app.player.play()
                 # Update button state
                 self.update_play_pause_button()
+
+    def play_recording(self, recording_id, playlist_id=None):
+        """Play a specific recording, optionally as part of a playlist."""
+        app = App.get_running_app()
+        try:
+            # Store the playlist ID if provided
+            if playlist_id is not None:
+                self.current_playlist_id = playlist_id
+            else:
+                # Clear playlist ID if not playing from a playlist
+                self.current_playlist_id = None
+
+            recording = app.database.get_recording(recording_id)
+
+            if recording:
+                # Make sure we're on the playback screen
+                app.root_layout.current = 'playback'
+
+                # Get the filepath from the recording
+                filepath = recording[3]  # filepath is at index 3
+
+                # Load the recording into the player
+                success = app.player.load(filepath)
+                if success:
+                    # Update playback info
+                    self.current_recording = recording
+                    self.update_playback_info(recording)
+
+                    # Start playback
+                    app.player.play()
+                    print(f"Playing recording: {recording[1]}")  # title is at index 1
+                else:
+                    print(f"Failed to load recording: {recording[1]}")
+            else:
+                print(f"Recording not found: ID {recording_id}")
+        except Exception as e:
+            print(f"Error playing recording: {e}")
 
     def play_next_track(self):
         """Play the next track in the list."""
@@ -1062,14 +1088,58 @@ class PlaybackScreen(Screen):
         app = App.get_running_app()
         app.root_layout.current = 'home'
 
+    def play_next_in_playlist(self):
+        """Play the next track in the current playlist if available."""
+        app = App.get_running_app()
+
+        # Check if we're in a playlist
+        if not hasattr(self, 'current_playlist_id') or not self.current_playlist_id:
+            print("Not in a playlist - can't play next track")
+            return False
+
+        try:
+            # Get all recordings in the current playlist
+            playlist_recordings = app.database.get_playlist_recordings(self.current_playlist_id)
+
+            if not playlist_recordings or len(playlist_recordings) <= 1:
+                print("Playlist empty or has only one item")
+                return False
+
+            # Find current recording's position in playlist
+            current_position = None
+            for i, rec in enumerate(playlist_recordings):
+                if rec[0] == self.current_recording[0]:  # Compare recording IDs
+                    current_position = i
+                    break
+
+            if current_position is None:
+                print("Current recording not found in playlist")
+                return False
+
+            # Check if there's a next track
+            if current_position < len(playlist_recordings) - 1:
+                next_recording = playlist_recordings[current_position + 1]
+                print(f"Playing next track: {next_recording[1]}")  # Title is at index 1
+
+                # Play the next recording
+                self.play_recording(next_recording[0])
+                return True
+            else:
+                print("End of playlist reached")
+                return False
+
+        except Exception as e:
+            print(f"Error playing next track: {e}")
+            return False
+
     def on_leave(self):
-        """Clean up when leaving screen."""
-        # Stop UI updates
+        """Called when the screen is exited."""
+        # Stop the UI update timer
         if self.update_event:
             self.update_event.cancel()
             self.update_event = None
 
-        # Unbind events
+        # Unbind from track finished event
         app = App.get_running_app()
         if app.player:
             app.player.unbind(on_track_finished=self.on_track_finished)

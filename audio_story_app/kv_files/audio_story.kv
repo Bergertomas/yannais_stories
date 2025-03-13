@@ -1,6 +1,14 @@
 #:kivy 2.0.0
 #:import theme theme
 
+<ScreenManager>:
+    canvas.before:
+        Color:
+            rgba: 0, 0, 0, 0  # Transparent
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
 <FixedWidthView@BoxLayout>:
     orientation: 'vertical'
     padding: dp(20)
@@ -8,7 +16,7 @@
     size_hint: (1, 1)
     canvas.before:
         Color:
-            rgba: theme.BACKGROUND_COLOR
+            rgba: 0, 0, 0, 0  # Transparent
         Rectangle:
             pos: self.pos
             size: self.size
@@ -64,10 +72,16 @@
     effect_cls: "ScrollEffect"
     scroll_type: ['bars']
 
-<ScreenManager>:
+# Define playback button styles
+<PlaybackButton@Button>:
+    background_normal: ''
+    font_size: dp(24)
+    size_hint_y: None
+    height: dp(50)
     canvas.before:
         Color:
-            rgba: theme.BACKGROUND_COLOR
-        Rectangle:
+            rgba: self.background_color
+        RoundedRectangle:
             pos: self.pos
             size: self.size
+            radius: [10]

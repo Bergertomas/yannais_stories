@@ -4,9 +4,7 @@ from kivy.properties import NumericProperty, StringProperty, BooleanProperty
 from kivy.event import EventDispatcher
 import os
 import time
-import platform as sys_platform  # Add this import line
 
-plugin_path = None  # Initialize to None
 
 class AudioPlayer(EventDispatcher):
     """Audio player using VLC for reliable playback control."""
@@ -16,6 +14,7 @@ class AudioPlayer(EventDispatcher):
     is_playing = BooleanProperty(False)
     current_file = StringProperty("")
     volume = NumericProperty(1.0)
+    _track_finished = False  # Track whether we've already dispatched a finish event
 
     def __init__(self, **kwargs):
         self.register_event_type('on_track_finished')
@@ -29,68 +28,56 @@ class AudioPlayer(EventDispatcher):
         self.initialize_vlc()
 
     def initialize_vlc(self):
-        """Initialize VLC with better platform detection."""
+        """Initialize VLC with more aggressive path finding."""
         try:
-            # Platform-specific initialization
-            system = sys_platform.system()
-            plugin_path = None  # Initialize to None
+            # Try to find the actual VLC binary path
+            import subprocess
 
-            print(f"Detected platform: {system}")
+            try:
+                # Try to get VLC path from the system
+                result = subprocess.run(['which', 'vlc'], capture_output=True, text=True)
+                vlc_binary = result.stdout.strip()
 
-            if system == "Darwin":  # macOS
-                possible_paths = [
-                    '/Applications/VLC.app/Contents/MacOS/lib',
-                    '/Applications/VLC.app/Contents/MacOS/plugins'
-                ]
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        plugin_path = path
-                        break
+                if vlc_binary:
+                    # Get the directory containing VLC
+                    vlc_dir = os.path.dirname(vlc_binary)
+                    print(f"Found VLC binary at: {vlc_dir}")
 
-            elif system == "Windows":
-                # Windows paths
-                possible_paths = [
-                    r"C:\Program Files\VideoLAN\VLC\plugins",
-                    r"C:\Program Files (x86)\VideoLAN\VLC\plugins"
-                ]
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        plugin_path = path
-                        break
+                    # Use this to find the lib directory
+                    if "/Applications/VLC.app" in vlc_dir:
+                        # Mac app bundle
+                        plugin_path = '/Applications/VLC.app/Contents/MacOS/lib'
+                    else:
+                        # Try common relative paths from the binary
+                        possible_lib_paths = [
+                            os.path.join(vlc_dir, '..', 'lib'),
+                            os.path.join(vlc_dir, '..', 'lib', 'vlc'),
+                            os.path.join(vlc_dir, 'lib'),
+                            os.path.join(vlc_dir, 'lib', 'vlc')
+                        ]
 
-            elif system == "Linux":
-                # Linux paths
-                possible_paths = [
-                    '/usr/lib/vlc/plugins',
-                    '/usr/lib/x86_64-linux-gnu/vlc/plugins',
-                    '/usr/local/lib/vlc/plugins'
-                ]
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        plugin_path = path
-                        break
+                        for path in possible_lib_paths:
+                            if os.path.exists(path):
+                                plugin_path = path
+                                break
 
-            # Create the VLC instance
-            if plugin_path:
-                print(f"Using VLC plugin path: {plugin_path}")
-                self.vlc_instance = vlc.Instance(f'--plugin-path={plugin_path}')
-            else:
-                print("No VLC plugin path found, using default instance")
+                    if plugin_path:
+                        print(f"Using VLC plugin path: {plugin_path}")
+                        self.vlc_instance = vlc.Instance(f'--plugin-path={plugin_path}')
+                    else:
+                        # Fall back to default
+                        self.vlc_instance = vlc.Instance()
+                else:
+                    # Fall back to default
+                    self.vlc_instance = vlc.Instance()
+            except Exception as e:
+                print(f"Error finding VLC path: {e}")
                 self.vlc_instance = vlc.Instance()
 
-            # Create the media player
             self.player = self.vlc_instance.media_player_new()
-
             print("VLC initialized successfully")
         except Exception as e:
             print(f"Error initializing VLC: {e}")
-            # Try a simple initialization as fallback
-            try:
-                self.vlc_instance = vlc.Instance()
-                self.player = self.vlc_instance.media_player_new()
-                print("Fallback VLC initialization succeeded")
-            except Exception as e2:
-                print(f"Fallback VLC initialization failed: {e2}")
 
     def load(self, filepath):
         """Load an audio file."""
@@ -108,6 +95,9 @@ class AudioPlayer(EventDispatcher):
         self.stop()
 
         try:
+            # Reset track finished flag when loading new track
+            self._track_finished = False
+
             # Create a new media
             media = self.vlc_instance.media_new(filepath)
 
@@ -120,19 +110,35 @@ class AudioPlayer(EventDispatcher):
             # Set media properties
             self.current_file = filepath
 
-            # Get duration (in milliseconds) and convert to seconds
-            # Try to get duration after a small delay to ensure parsing is complete
-            def get_duration(dt):
+            # Get duration from media directly first - more reliable
+            duration_ms = media.get_duration()
+            if duration_ms <= 0:
+                # Fall back to player if media doesn't have duration
                 duration_ms = self.player.get_length()
-                if duration_ms > 0:
-                    self.duration = duration_ms / 1000.0
-                    print(f"Duration updated to {self.duration} seconds")
-                else:
-                    # If VLC can't determine length, use fallback
-                    self.duration = 100
-                    print("Using fallback duration of 100 seconds")
 
-            Clock.schedule_once(get_duration, 0.5)
+            # Set duration based on what we found
+            if duration_ms > 0:
+                self.duration = duration_ms / 1000.0
+                print(f"Duration detected: {self.duration:.3f} seconds")
+            else:
+                # If we have a database with the file, get duration from there
+                app = App.get_running_app()
+                if hasattr(app, 'database'):
+                    try:
+                        # Try to find the file in the database
+                        all_recordings = app.database.get_all_recordings()
+                        for rec in all_recordings:
+                            if rec[3] == filepath:  # filepath is at index 3
+                                self.duration = rec[4]  # duration is at index 4
+                                print(f"Using database duration: {self.duration:.3f}s")
+                                break
+                    except Exception as e:
+                        print(f"Error getting duration from database: {e}")
+
+                # If still no duration, use fallback
+                if self.duration <= 0:
+                    self.duration = 100
+                    print("Could not determine duration, using default (100s)")
 
             # Reset position
             self.current_pos = 0
@@ -145,7 +151,7 @@ class AudioPlayer(EventDispatcher):
                 self.update_event.cancel()
             self.update_event = Clock.schedule_interval(self.update_position, 0.1)
 
-            print(f"File loaded successfully.")
+            print(f"File loaded successfully. Duration: {self.duration}s")
             return True
         except Exception as e:
             print(f"Error loading audio file: {e}")
@@ -158,7 +164,24 @@ class AudioPlayer(EventDispatcher):
             return
 
         try:
-            self.player.play()
+            # Get current state
+            state = self.player.get_state()
+
+            # If track has ended, we need to completely reset it
+            if state == vlc.State.Ended:
+                print("Track ended, restarting from beginning")
+                # Stop first to reset the player state
+                self.player.stop()
+                # Slight delay to ensure internal VLC state is reset
+                time.sleep(0.1)
+                # Then play will start from the beginning
+                self.player.play()
+            else:
+                # Normal play for non-ended tracks
+                self.player.play()
+
+            # Update state
+            self._track_finished = False
             self.is_playing = True
             print("Started/resumed playback")
         except Exception as e:
@@ -185,6 +208,8 @@ class AudioPlayer(EventDispatcher):
             self.player.stop()
             self.is_playing = False
             self.current_pos = 0
+            # Reset finished state
+            self._track_finished = False
             print("Stopped playback")
         except Exception as e:
             print(f"Error stopping: {e}")
@@ -192,35 +217,40 @@ class AudioPlayer(EventDispatcher):
     def seek(self, position):
         """Seek to a specific position in seconds."""
         if not self.vlc_instance or not self.player:
-            print("Cannot seek: VLC not initialized")
             return
 
         try:
+            # Reset track finished state when seeking
+            self._track_finished = False
+
             # Convert to milliseconds for VLC
             ms_position = int(position * 1000)
 
-            # Check if the position is valid
-            if ms_position < 0:
-                ms_position = 0
+            # Get current state
+            state = self.player.get_state()
 
-            # Get the current media length in case duration isn't updated yet
-            length = self.player.get_length()
-            if length > 0 and ms_position > length:
-                ms_position = length
+            # If the track has ended, we need to reset it completely
+            if state == vlc.State.Ended:
+                print(f"Track ended, seeking to {position}s requires restart")
+                # Stop and reset
+                self.player.stop()
+                time.sleep(0.1)  # Short delay to ensure VLC state is reset
+                self.player.play()  # Start playback
+                time.sleep(0.1)  # Allow playback to start
 
-            # Perform the seek
-            result = self.player.set_time(ms_position)
+                # Then seek to the desired position
+                self.player.set_time(ms_position)
 
-            # Update current position property
+                # If we're not actually wanting to play, pause immediately
+                if not self.is_playing:
+                    self.player.pause()
+            else:
+                # Normal seek
+                self.player.set_time(ms_position)
+
+            # Update our position tracking
             self.current_pos = position
-
-            print(f"Seeking to position: {position}s (Result: {'Success' if result != -1 else 'Failed'})")
-
-            # If seeking failed and the media is playing, try playing again
-            if result == -1 and self.is_playing:
-                print("Seek failed, trying to restart playback...")
-                self.player.play()
-
+            print(f"Seeking to position: {position}s (Result: Success)")
         except Exception as e:
             print(f"Error seeking: {e}")
 
@@ -239,7 +269,7 @@ class AudioPlayer(EventDispatcher):
             print(f"Error setting volume: {e}")
 
     def update_position(self, dt):
-        """Update the current position property and check for end of track."""
+        """Update the current position property."""
         if not self.vlc_instance or not self.player:
             return
 
@@ -249,35 +279,23 @@ class AudioPlayer(EventDispatcher):
             if time_ms >= 0:
                 self.current_pos = time_ms / 1000.0
 
-            # Update duration if it wasn't available at load time
-            if self.duration <= 0 or self.duration == 100:  # If using the fallback duration
-                length_ms = self.player.get_length()
-                if length_ms > 0:
-                    self.duration = length_ms / 1000.0
+            # Check if we've reached the end
+            state = self.player.get_state()
 
-            # Check for end of playback only if we're actually playing
-            if self.is_playing and not self.end_reached:
-                # Make sure we have valid duration and position
-                if self.current_pos > 0 and self.duration > 0:
-                    # Check if we've reached the end (within a small margin)
-                    if self.current_pos >= self.duration - 0.5:  # 0.5 second buffer
-                        print(f"Track reached end - position: {self.current_pos}, duration: {self.duration}")
-                        self.end_reached = True
-                        self.is_playing = False
-                        self.current_pos = 0
-
-                        # Dispatch the track finished event
-                        self.dispatch('on_track_finished')
-
-                # Alternative end detection method - check state
-                if self.player.get_state() == vlc.State.Ended:
-                    if not self.end_reached:
-                        print("Track ended (state detection)")
-                        self.end_reached = True
-                        self.is_playing = False
-                        self.current_pos = 0
-                        self.dispatch('on_track_finished')
-
+            # Check for end state directly from VLC state
+            if state == vlc.State.Ended:
+                # Only dispatch event if we haven't already marked this track as finished
+                if not self._track_finished:
+                    print("Track finished")
+                    self.is_playing = False
+                    # Do NOT reset current_pos here, keep at the end so we know
+                    # self._track_finished = True
+                    self.dispatch('on_track_finished')
+                    # Mark track as finished, but don't reset position
+                    self._track_finished = True
+            elif state != vlc.State.Ended and self._track_finished:
+                # Reset finished state if track is no longer at the end
+                self._track_finished = False
         except Exception as e:
             print(f"Error updating position: {e}")
 
